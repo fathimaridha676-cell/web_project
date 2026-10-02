@@ -19,7 +19,7 @@ class _CategoryPageState extends State<CategoryPage> {
 
   Future<void> _saveCategory() async {
     if (_nameEnController.text.isEmpty || _nameArController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context)..clearSnackBars()..showSnackBar(
         const SnackBar(content: Text('Please enter category names.')),
       );
       return;
@@ -33,6 +33,7 @@ class _CategoryPageState extends State<CategoryPage> {
       'serialNumber': serialNumber,
       'nameEn': _nameEnController.text,
       'nameAr': _nameArController.text,
+      'isDeleted': false,
     });
 
     _serialController.clear();
@@ -40,7 +41,7 @@ class _CategoryPageState extends State<CategoryPage> {
     _nameArController.clear();
 
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context)..clearSnackBars()..showSnackBar(
         const SnackBar(content: Text('Category added successfully!')),
       );
     }
@@ -52,18 +53,127 @@ class _CategoryPageState extends State<CategoryPage> {
         .where('categoryId', isEqualTo: category.id)
         .get();
 
+    final associatedDocs = productsSnapshot.docs.where((doc) {
+      return (doc.data()['isDeleted'] ?? false) == false;
+    }).toList();
+
     if (!mounted) return;
 
-    final int associatedProductsCount = productsSnapshot.docs.length;
+    final int associatedProductsCount = associatedDocs.length;
+    bool deleteAssociatedProducts = false;
+    String confirmationName = '';
 
     final bool? confirm = await showDialog<bool>(
       context: context,
       builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            bool isNameMatching = confirmationName == category.nameEn;
+
+            return AlertDialog(
+              title: const Text('Delete Category?'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Are you sure you want to delete "${category.nameEn}"?'),
+                  const SizedBox(height: 16),
+                  if (associatedProductsCount > 0)
+                    CheckboxListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text('Also delete $associatedProductsCount associated product(s)'),
+                      value: deleteAssociatedProducts,
+                      onChanged: (value) {
+                        setState(() {
+                          deleteAssociatedProducts = value ?? false;
+                        });
+                      },
+                    ),
+                  const SizedBox(height: 16),
+                  Text('Type "${category.nameEn}" to confirm:'),
+                  const SizedBox(height: 8),
+                  TextField(
+                    decoration: InputDecoration(
+                      hintText: category.nameEn,
+                      border: const OutlineInputBorder(),
+                    ),
+                    onChanged: (value) {
+                      setState(() {
+                        confirmationName = value;
+                      });
+                    },
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: const Text('Cancel'),
+                ),
+                TextButton(
+                  onPressed: isNameMatching ? () => Navigator.of(context).pop(true) : null,
+                  style: TextButton.styleFrom(foregroundColor: Colors.red),
+                  child: const Text('Delete'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (confirm == true) {
+      WriteBatch batch = FirebaseFirestore.instance.batch();
+      
+      if (deleteAssociatedProducts) {
+        for (var doc in associatedDocs) {
+          batch.update(doc.reference, {'isDeleted': true});
+        }
+      }
+      
+      batch.update(_categoryCollection.doc(category.id), {'isDeleted': true});
+      await batch.commit();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context)..clearSnackBars()..showSnackBar(
+          SnackBar(content: Text('Category "${category.nameEn}" deleted.')),
+        );
+      }
+    }
+  }
+
+  Future<void> _editCategory(CategoryModel category) async {
+    final TextEditingController editSerialController = TextEditingController(text: category.serialNumber.toString());
+    final TextEditingController editNameEnController = TextEditingController(text: category.nameEn);
+    final TextEditingController editNameArController = TextEditingController(text: category.nameAr);
+
+    final bool? save = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text('Delete Category?'),
-          content: Text(
-            'Are you sure you want to delete "${category.nameEn}"?\n\n'
-            '${associatedProductsCount > 0 ? 'Warning: This will also delete $associatedProductsCount associated product(s).' : 'This action cannot be undone.'}',
+          title: const Text('Edit Category'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: editSerialController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Serial Number'),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: editNameEnController,
+                  decoration: const InputDecoration(labelText: 'Name (English)'),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: editNameArController,
+                  textDirection: TextDirection.rtl,
+                  decoration: const InputDecoration(labelText: 'Name (Arabic)'),
+                ),
+              ],
+            ),
           ),
           actions: [
             TextButton(
@@ -72,25 +182,33 @@ class _CategoryPageState extends State<CategoryPage> {
             ),
             TextButton(
               onPressed: () => Navigator.of(context).pop(true),
-              style: TextButton.styleFrom(foregroundColor: Colors.red),
-              child: const Text('Delete'),
+              child: const Text('Save'),
             ),
           ],
         );
       },
     );
 
-    if (confirm == true) {
-      WriteBatch batch = FirebaseFirestore.instance.batch();
-      for (var doc in productsSnapshot.docs) {
-        batch.delete(doc.reference);
+    if (save == true) {
+      if (editNameEnController.text.isEmpty || editNameArController.text.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context)..clearSnackBars()..showSnackBar(
+            const SnackBar(content: Text('Names cannot be empty.')),
+          );
+        }
+        return;
       }
-      batch.delete(_categoryCollection.doc(category.id));
-      await batch.commit();
+      int serialNumber = int.tryParse(editSerialController.text) ?? 0;
+      
+      await _categoryCollection.doc(category.id).update({
+        'serialNumber': serialNumber,
+        'nameEn': editNameEnController.text,
+        'nameAr': editNameArController.text,
+      });
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Category "${category.nameEn}" deleted.')),
+        ScaffoldMessenger.of(context)..clearSnackBars()..showSnackBar(
+          const SnackBar(content: Text('Category updated successfully!')),
         );
       }
     }
@@ -107,83 +225,56 @@ class _CategoryPageState extends State<CategoryPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Categories')),
-      body: Column(
+      appBar: AppBar(
+        title: const Text('Manage Categories'),
+      ),
+      body: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Add Category Form
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Card(
-              elevation: 2,
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
+          // Form Section
+          Expanded(
+            flex: 1,
+            child: Container(
+              padding: const EdgeInsets.all(24.0),
+              decoration: BoxDecoration(
+                color: Colors.grey[50],
+                border: Border(right: BorderSide(color: Colors.grey[300]!)),
+              ),
+              child: SingleChildScrollView(
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Add New Category',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
+                    const Text('Create New Category', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.teal)),
+                    const SizedBox(height: 24),
+                    TextField(
+                      controller: _serialController,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(labelText: 'Serial Number', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
                     ),
                     const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          flex: 1,
-                          child: TextField(
-                            controller: _serialController,
-                            keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(
-                              labelText: 'Serial Number',
-                              border: OutlineInputBorder(),
-                              contentPadding: EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 8,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          flex: 2,
-                          child: TextField(
-                            controller: _nameEnController,
-                            decoration: const InputDecoration(
-                              labelText: 'Name (English)',
-                              border: OutlineInputBorder(),
-                              contentPadding: EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 8,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          flex: 2,
-                          child: TextField(
-                            controller: _nameArController,
-                            decoration: const InputDecoration(
-                              labelText: 'Name (Arabic)',
-                              border: OutlineInputBorder(),
-                              contentPadding: EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 8,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
+                    TextField(
+                      controller: _nameEnController,
+                      decoration: InputDecoration(labelText: 'Category Name (EN)', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
                     ),
                     const SizedBox(height: 16),
-                    ElevatedButton.icon(
-                      onPressed: _saveCategory,
-                      icon: const Icon(Icons.add),
-                      label: const Text('Save Category'),
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
+                    TextField(
+                      controller: _nameArController,
+                      textDirection: TextDirection.rtl,
+                      decoration: InputDecoration(labelText: 'Category Name (AR)', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
+                    ),
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: ElevatedButton.icon(
+                        onPressed: _saveCategory,
+                        icon: const Icon(Icons.add_circle_outline),
+                        label: const Text('Create Category', style: TextStyle(fontSize: 16)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.teal,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
                       ),
                     ),
                   ],
@@ -192,50 +283,72 @@ class _CategoryPageState extends State<CategoryPage> {
             ),
           ),
 
-          const Divider(height: 1),
-
-          // Categories List
+          // List Section
           Expanded(
+            flex: 2,
             child: StreamBuilder<QuerySnapshot>(
               stream: _categoryCollection.orderBy('serialNumber').snapshots(),
               builder: (context, snapshot) {
-                if (snapshot.hasError) {
-                  return const Center(child: Text('Something went wrong'));
-                }
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
+                if (snapshot.hasError) return const Center(child: Text('Something went wrong'));
+                if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
 
-                final docs = snapshot.data!.docs;
+                final docs = snapshot.data!.docs.where((doc) {
+                  return (doc.data() as Map<String, dynamic>)['isDeleted'] != true;
+                }).toList();
 
                 if (docs.isEmpty) {
-                  return const Center(child: Text('No categories found.'));
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.category_outlined, size: 80, color: Colors.grey[300]),
+                        const SizedBox(height: 16),
+                        Text('No Categories found.', style: TextStyle(fontSize: 20, color: Colors.grey[500])),
+                      ],
+                    ),
+                  );
                 }
 
                 return ListView.builder(
+                  padding: const EdgeInsets.all(24),
                   itemCount: docs.length,
                   itemBuilder: (context, index) {
-                    final doc = docs[index];
-                    final category = CategoryModel.fromMap(
-                      doc.data() as Map<String, dynamic>,
-                      doc.id,
-                    );
-
+                    final category = CategoryModel.fromMap(docs[index].data() as Map<String, dynamic>, docs[index].id);
                     return Card(
-                      margin: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
+                      elevation: 3,
+                      margin: const EdgeInsets.only(bottom: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                       child: ListTile(
-                        leading: CircleAvatar(
-                          child: Text('${category.serialNumber}'),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        leading: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.teal.withOpacity(0.1),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Text('${category.serialNumber}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.teal, fontSize: 16)),
                         ),
-                        title: Text(category.nameEn),
-                        subtitle: Text(category.nameAr),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.delete_outline, color: Colors.red),
-                          tooltip: 'Delete Category',
-                          onPressed: () => _confirmDeleteCategory(category),
+                        title: Text(category.nameEn, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                        subtitle: Padding(
+                          padding: const EdgeInsets.only(top: 8.0),
+                          child: Text('Arabic: ${category.nameAr}', style: TextStyle(color: Colors.grey[700])),
+                        ),
+                        isThreeLine: true,
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.edit_note, color: Colors.blue, size: 28),
+                              onPressed: () => _editCategory(category),
+                              tooltip: 'Edit',
+                            ),
+                            const SizedBox(width: 8),
+                            IconButton(
+                              icon: const Icon(Icons.delete_sweep, color: Colors.red, size: 28),
+                              onPressed: () => _confirmDeleteCategory(category),
+                              tooltip: 'Delete',
+                            ),
+                          ],
                         ),
                       ),
                     );
