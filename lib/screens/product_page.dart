@@ -29,10 +29,12 @@ class _ProductPageState extends State<ProductPage> {
   String? _selectedCategoryId;
   Map<String, double> _selectedAddons = {};
   Map<String, TextEditingController> _addonPriceControllers = {};
+  String _searchQuery = '';
+  String? _filterCategoryId;
 
   List<CategoryModel> _categories = [];
   StreamSubscription<QuerySnapshot>? _categorySubscription;
-  
+
   List<AddonModel> _addons = [];
   StreamSubscription<QuerySnapshot>? _addonSubscription;
 
@@ -51,12 +53,22 @@ class _ProductPageState extends State<ProductPage> {
       if (mounted) {
         setState(() {
           _addons = snapshot.docs
-              .where((doc) => (doc.data() as Map<String, dynamic>)['isDeleted'] != true)
-              .map((doc) => AddonModel.fromMap(doc.data() as Map<String, dynamic>, doc.id))
+              .where(
+                (doc) =>
+                    (doc.data() as Map<String, dynamic>)['isDeleted'] != true,
+              )
+              .map(
+                (doc) => AddonModel.fromMap(
+                  doc.data() as Map<String, dynamic>,
+                  doc.id,
+                ),
+              )
               .toList();
           for (var addon in _addons) {
             if (!_addonPriceControllers.containsKey(addon.id)) {
-              _addonPriceControllers[addon.id] = TextEditingController(text: addon.price.toStringAsFixed(2));
+              _addonPriceControllers[addon.id] = TextEditingController(
+                text: addon.price.toStringAsFixed(2),
+              );
             }
           }
         });
@@ -96,11 +108,13 @@ class _ProductPageState extends State<ProductPage> {
     if (_nameEnController.text.isEmpty ||
         _nameArController.text.isEmpty ||
         _selectedCategoryId == null) {
-      ScaffoldMessenger.of(context)..clearSnackBars()..showSnackBar(
-        const SnackBar(
-          content: Text('Please fill all fields and select a category.'),
-        ),
-      );
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('Please fill all fields and select a category.'),
+          ),
+        );
       return;
     }
 
@@ -130,9 +144,11 @@ class _ProductPageState extends State<ProductPage> {
     });
 
     if (mounted) {
-      ScaffoldMessenger.of(context)..clearSnackBars()..showSnackBar(
-        const SnackBar(content: Text('Product added successfully!')),
-      );
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          const SnackBar(content: Text('Product added successfully!')),
+        );
     }
   }
 
@@ -163,9 +179,11 @@ class _ProductPageState extends State<ProductPage> {
     if (confirm == true) {
       await _productCollection.doc(product.id).update({'isDeleted': true});
       if (mounted) {
-        ScaffoldMessenger.of(context)..clearSnackBars()..showSnackBar(
-          SnackBar(content: Text('Product "${product.nameEn}" deleted.')),
-        );
+        ScaffoldMessenger.of(context)
+          ..clearSnackBars()
+          ..showSnackBar(
+            SnackBar(content: Text('Product "${product.nameEn}" deleted.')),
+          );
       }
     }
   }
@@ -189,9 +207,9 @@ class _ProductPageState extends State<ProductPage> {
     Map<String, TextEditingController> editAddonPriceControllers = {};
     for (var addon in _addons) {
       editAddonPriceControllers[addon.id] = TextEditingController(
-        text: editSelectedAddons.containsKey(addon.id) 
-              ? editSelectedAddons[addon.id]!.toStringAsFixed(2) 
-              : addon.price.toStringAsFixed(2)
+        text: editSelectedAddons.containsKey(addon.id)
+            ? editSelectedAddons[addon.id]!.toStringAsFixed(2)
+            : addon.price.toStringAsFixed(2),
       );
     }
 
@@ -264,28 +282,39 @@ class _ProductPageState extends State<ProductPage> {
                     const SizedBox(height: 16),
                     Row(
                       children: [
-                        const Text('Select Add-ons', style: TextStyle(fontWeight: FontWeight.bold)),
+                        const Text(
+                          'Select Add-ons',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
                         const Spacer(),
                         Checkbox(
-                          value: editSelectedAddons.length == _addons.length && _addons.isNotEmpty,
+                          value:
+                              editSelectedAddons.length == _addons.length &&
+                              _addons.isNotEmpty,
                           onChanged: (val) {
                             setState(() {
                               if (val == true) {
                                 for (var a in _addons) {
-                                  editSelectedAddons[a.id] = double.tryParse(editAddonPriceControllers[a.id]!.text) ?? a.price;
+                                  editSelectedAddons[a.id] =
+                                      double.tryParse(
+                                        editAddonPriceControllers[a.id]!.text,
+                                      ) ??
+                                      a.price;
                                 }
                               } else {
                                 editSelectedAddons.clear();
                               }
                             });
-                          }
+                          },
                         ),
                         const Text('Select All'),
                       ],
                     ),
                     Column(
                       children: _addons.map((addon) {
-                        final isSelected = editSelectedAddons.containsKey(addon.id);
+                        final isSelected = editSelectedAddons.containsKey(
+                          addon.id,
+                        );
                         return Row(
                           children: [
                             Checkbox(
@@ -293,12 +322,17 @@ class _ProductPageState extends State<ProductPage> {
                               onChanged: (val) {
                                 setState(() {
                                   if (val == true) {
-                                    editSelectedAddons[addon.id] = double.tryParse(editAddonPriceControllers[addon.id]!.text) ?? addon.price;
+                                    editSelectedAddons[addon.id] =
+                                        double.tryParse(
+                                          editAddonPriceControllers[addon.id]!
+                                              .text,
+                                        ) ??
+                                        addon.price;
                                   } else {
                                     editSelectedAddons.remove(addon.id);
                                   }
                                 });
-                              }
+                              },
                             ),
                             Expanded(child: Text(addon.nameEn)),
                             SizedBox(
@@ -306,10 +340,14 @@ class _ProductPageState extends State<ProductPage> {
                               child: TextField(
                                 controller: editAddonPriceControllers[addon.id],
                                 keyboardType: TextInputType.number,
-                                decoration: const InputDecoration(isDense: true, prefixText: '\$'),
+                                decoration: const InputDecoration(
+                                  isDense: true,
+                                  prefixText: '\$',
+                                ),
                                 onChanged: (val) {
                                   if (isSelected) {
-                                    editSelectedAddons[addon.id] = double.tryParse(val) ?? addon.price;
+                                    editSelectedAddons[addon.id] =
+                                        double.tryParse(val) ?? addon.price;
                                   }
                                 },
                               ),
@@ -342,9 +380,11 @@ class _ProductPageState extends State<ProductPage> {
           editNameArController.text.isEmpty ||
           editSelectedCategoryId == null) {
         if (mounted) {
-          ScaffoldMessenger.of(context)..clearSnackBars()..showSnackBar(
-            const SnackBar(content: Text('Please fill all fields.')),
-          );
+          ScaffoldMessenger.of(context)
+            ..clearSnackBars()
+            ..showSnackBar(
+              const SnackBar(content: Text('Please fill all fields.')),
+            );
         }
         return;
       }
@@ -361,9 +401,11 @@ class _ProductPageState extends State<ProductPage> {
       });
 
       if (mounted) {
-        ScaffoldMessenger.of(context)..clearSnackBars()..showSnackBar(
-          const SnackBar(content: Text('Product updated successfully!')),
-        );
+        ScaffoldMessenger.of(context)
+          ..clearSnackBars()
+          ..showSnackBar(
+            const SnackBar(content: Text('Product updated successfully!')),
+          );
       }
     }
   }
@@ -383,9 +425,7 @@ class _ProductPageState extends State<ProductPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Manage Products'),
-      ),
+      appBar: AppBar(title: const Text('Manage Products')),
       body: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -402,7 +442,14 @@ class _ProductPageState extends State<ProductPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Create New Product', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.teal)),
+                    const Text(
+                      'Create New Product',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.teal,
+                      ),
+                    ),
                     const SizedBox(height: 24),
                     Row(
                       children: [
@@ -410,11 +457,20 @@ class _ProductPageState extends State<ProductPage> {
                           flex: 2,
                           child: DropdownButtonFormField<String>(
                             value: _selectedCategoryId,
-                            decoration: InputDecoration(labelText: 'Category', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
+                            decoration: InputDecoration(
+                              labelText: 'Category',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
                             items: _categories.map((category) {
-                              return DropdownMenuItem(value: category.id, child: Text(category.nameEn));
+                              return DropdownMenuItem(
+                                value: category.id,
+                                child: Text(category.nameEn),
+                              );
                             }).toList(),
-                            onChanged: (value) => setState(() => _selectedCategoryId = value),
+                            onChanged: (value) =>
+                                setState(() => _selectedCategoryId = value),
                           ),
                         ),
                         const SizedBox(width: 16),
@@ -423,7 +479,13 @@ class _ProductPageState extends State<ProductPage> {
                           child: TextField(
                             controller: _priceController,
                             keyboardType: TextInputType.number,
-                            decoration: InputDecoration(labelText: 'Price', prefixIcon: const Icon(Icons.attach_money), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
+                            decoration: InputDecoration(
+                              labelText: 'Price',
+                              prefixIcon: const Icon(Icons.attach_money),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
                           ),
                         ),
                       ],
@@ -431,44 +493,77 @@ class _ProductPageState extends State<ProductPage> {
                     const SizedBox(height: 16),
                     TextField(
                       controller: _nameEnController,
-                      decoration: InputDecoration(labelText: 'Product Name (EN)', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
+                      decoration: InputDecoration(
+                        labelText: 'Product Name (EN)',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
                     ),
                     const SizedBox(height: 16),
                     TextField(
                       controller: _nameArController,
                       textDirection: TextDirection.rtl,
-                      decoration: InputDecoration(labelText: 'Product Name (AR)', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
+                      decoration: InputDecoration(
+                        labelText: 'Product Name (AR)',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
                     ),
                     const SizedBox(height: 16),
                     TextField(
                       controller: _descriptionController,
                       maxLines: 2,
-                      decoration: InputDecoration(labelText: 'Description', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
+                      decoration: InputDecoration(
+                        labelText: 'Description',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
                     ),
                     const SizedBox(height: 16),
                     TextField(
                       controller: _extraIngredientsController,
                       maxLines: 2,
-                      decoration: InputDecoration(labelText: 'Ingredients (Line by Line)', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
+                      decoration: InputDecoration(
+                        labelText: 'Ingredients (Line by Line)',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
                     ),
                     const SizedBox(height: 16),
                     Row(
                       children: [
-                        const Text('Add-ons', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.teal)),
+                        const Text(
+                          'Add-ons',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            color: Colors.teal,
+                          ),
+                        ),
                         const Spacer(),
                         Checkbox(
-                          value: _selectedAddons.length == _addons.length && _addons.isNotEmpty,
+                          value:
+                              _selectedAddons.length == _addons.length &&
+                              _addons.isNotEmpty,
                           onChanged: (val) {
                             setState(() {
                               if (val == true) {
                                 for (var a in _addons) {
-                                  _selectedAddons[a.id] = double.tryParse(_addonPriceControllers[a.id]!.text) ?? a.price;
+                                  _selectedAddons[a.id] =
+                                      double.tryParse(
+                                        _addonPriceControllers[a.id]!.text,
+                                      ) ??
+                                      a.price;
                                 }
                               } else {
                                 _selectedAddons.clear();
                               }
                             });
-                          }
+                          },
                         ),
                         const Text('Select All'),
                       ],
@@ -476,7 +571,9 @@ class _ProductPageState extends State<ProductPage> {
                     const SizedBox(height: 8),
                     Column(
                       children: _addons.map((addon) {
-                        final isSelected = _selectedAddons.containsKey(addon.id);
+                        final isSelected = _selectedAddons.containsKey(
+                          addon.id,
+                        );
                         return Row(
                           children: [
                             Checkbox(
@@ -484,12 +581,17 @@ class _ProductPageState extends State<ProductPage> {
                               onChanged: (val) {
                                 setState(() {
                                   if (val == true) {
-                                    _selectedAddons[addon.id] = double.tryParse(_addonPriceControllers[addon.id]!.text) ?? addon.price;
+                                    _selectedAddons[addon.id] =
+                                        double.tryParse(
+                                          _addonPriceControllers[addon.id]!
+                                              .text,
+                                        ) ??
+                                        addon.price;
                                   } else {
                                     _selectedAddons.remove(addon.id);
                                   }
                                 });
-                              }
+                              },
                             ),
                             Expanded(child: Text(addon.nameEn)),
                             SizedBox(
@@ -497,10 +599,14 @@ class _ProductPageState extends State<ProductPage> {
                               child: TextField(
                                 controller: _addonPriceControllers[addon.id],
                                 keyboardType: TextInputType.number,
-                                decoration: const InputDecoration(isDense: true, prefixText: '\$'),
+                                decoration: const InputDecoration(
+                                  isDense: true,
+                                  prefixText: '\$',
+                                ),
                                 onChanged: (val) {
                                   if (isSelected) {
-                                    _selectedAddons[addon.id] = double.tryParse(val) ?? addon.price;
+                                    _selectedAddons[addon.id] =
+                                        double.tryParse(val) ?? addon.price;
                                   }
                                 },
                               ),
@@ -516,11 +622,16 @@ class _ProductPageState extends State<ProductPage> {
                       child: ElevatedButton.icon(
                         onPressed: _saveProduct,
                         icon: const Icon(Icons.add_circle_outline),
-                        label: const Text('Create Product', style: TextStyle(fontSize: 16)),
+                        label: const Text(
+                          'Create Product',
+                          style: TextStyle(fontSize: 16),
+                        ),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.teal,
                           foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
                       ),
                     ),
@@ -533,71 +644,212 @@ class _ProductPageState extends State<ProductPage> {
           // List Section
           Expanded(
             flex: 2,
-            child: StreamBuilder<QuerySnapshot>(
-              stream: _productStream,
-              builder: (context, snapshot) {
-                if (snapshot.hasError) return const Center(child: Text('Something went wrong'));
-                if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
-
-                final docs = snapshot.data!.docs.where((doc) {
-                  return (doc.data() as Map<String, dynamic>)['isDeleted'] != true;
-                }).toList();
-
-                if (docs.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.fastfood_outlined, size: 80, color: Colors.grey[300]),
-                        const SizedBox(height: 16),
-                        Text('No Products found.', style: TextStyle(fontSize: 20, color: Colors.grey[500])),
-                      ],
-                    ),
-                  );
-                }
-
-                return ListView.builder(
-                  padding: const EdgeInsets.all(24),
-                  itemCount: docs.length,
-                  itemBuilder: (context, index) {
-                    final doc = docs[index];
-                    final product = ProductModel.fromMap(doc.data() as Map<String, dynamic>, doc.id);
-
-                    final category = _categories.firstWhere(
-                      (c) => c.id == product.categoryId,
-                      orElse: () => CategoryModel(id: '', serialNumber: 0, nameEn: 'Unknown', nameAr: 'Unknown'),
-                    );
-
-                    return Card(
-                      elevation: 3,
-                      margin: const EdgeInsets.only(bottom: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                      child: ListTile(
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                        leading: Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(color: Colors.teal.withOpacity(0.1), shape: BoxShape.circle),
-                          child: const Icon(Icons.fastfood, color: Colors.teal),
-                        ),
-                        title: Text(product.nameEn, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                        subtitle: Padding(
-                          padding: const EdgeInsets.only(top: 8.0),
-                          child: Text('Category: ${category.nameEn}\nPrice: \$${product.price.toStringAsFixed(2)}', style: TextStyle(color: Colors.grey[700])),
-                        ),
-                        isThreeLine: true,
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(icon: const Icon(Icons.edit_note, color: Colors.blue, size: 28), onPressed: () => _editProduct(product), tooltip: 'Edit'),
-                            const SizedBox(width: 8),
-                            IconButton(icon: const Icon(Icons.delete_sweep, color: Colors.red, size: 28), onPressed: () => _confirmDeleteProduct(product), tooltip: 'Delete'),
-                          ],
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(24.0).copyWith(bottom: 0),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        flex: 2,
+                        child: TextField(
+                          decoration: InputDecoration(
+                            hintText: 'Search products...',
+                            prefixIcon: const Icon(Icons.search),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          onChanged: (value) {
+                            setState(() {
+                              _searchQuery = value.toLowerCase();
+                            });
+                          },
                         ),
                       ),
-                    );
-                  },
-                );
-              },
+                      const SizedBox(width: 16),
+                      Expanded(
+                        flex: 1,
+                        child: DropdownButtonFormField<String>(
+                          value: _filterCategoryId,
+                          decoration: InputDecoration(
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 0,
+                            ),
+                          ),
+                          hint: const Text('All Categories'),
+                          items: [
+                            const DropdownMenuItem(
+                              value: 'all',
+                              child: Text('All Categories'),
+                            ),
+                            ..._categories
+                                .map(
+                                  (c) => DropdownMenuItem(
+                                    value: c.id,
+                                    child: Text(c.nameEn),
+                                  ),
+                                )
+                                .toList(),
+                          ],
+                          onChanged: (value) {
+                            setState(() {
+                              _filterCategoryId = value;
+                            });
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: StreamBuilder<QuerySnapshot>(
+                    stream: _productStream,
+                    builder: (context, snapshot) {
+                      if (snapshot.hasError)
+                        return const Center(
+                          child: Text('Something went wrong'),
+                        );
+                      if (snapshot.connectionState == ConnectionState.waiting)
+                        return const Center(child: CircularProgressIndicator());
+
+                      final docs = snapshot.data!.docs.where((doc) {
+                        final data = doc.data() as Map<String, dynamic>;
+                        final nameEn = (data['nameEn'] ?? '')
+                            .toString()
+                            .toLowerCase();
+                        final nameAr = (data['nameAr'] ?? '')
+                            .toString()
+                            .toLowerCase();
+                        final matchesSearch =
+                            nameEn.contains(_searchQuery) ||
+                            nameAr.contains(_searchQuery);
+                        final matchesCategory =
+                            _filterCategoryId == null ||
+                            _filterCategoryId == 'all' ||
+                            data['categoryId'] == _filterCategoryId;
+                        return data['isDeleted'] != true &&
+                            matchesSearch &&
+                            matchesCategory;
+                      }).toList();
+
+                      if (docs.isEmpty) {
+                        return Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.fastfood_outlined,
+                                size: 80,
+                                color: Colors.grey[300],
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'No Products found.',
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  color: Colors.grey[500],
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+
+                      return ListView.builder(
+                        padding: const EdgeInsets.all(24),
+                        itemCount: docs.length,
+                        itemBuilder: (context, index) {
+                          final doc = docs[index];
+                          final product = ProductModel.fromMap(
+                            doc.data() as Map<String, dynamic>,
+                            doc.id,
+                          );
+
+                          final category = _categories.firstWhere(
+                            (c) => c.id == product.categoryId,
+                            orElse: () => CategoryModel(
+                              id: '',
+                              serialNumber: 0,
+                              nameEn: 'Unknown',
+                              nameAr: 'Unknown',
+                            ),
+                          );
+
+                          return Card(
+                            elevation: 3,
+                            margin: const EdgeInsets.only(bottom: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: ListTile(
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 24,
+                                vertical: 12,
+                              ),
+                              leading: Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.teal.withOpacity(0.1),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.fastfood,
+                                  color: Colors.teal,
+                                ),
+                              ),
+                              title: Text(
+                                product.nameEn,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 18,
+                                ),
+                              ),
+                              subtitle: Padding(
+                                padding: const EdgeInsets.only(top: 8.0),
+                                child: Text(
+                                  'Category: ${category.nameEn}\nPrice: \$${product.price.toStringAsFixed(2)}',
+                                  style: TextStyle(color: Colors.grey[700]),
+                                ),
+                              ),
+                              isThreeLine: true,
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.edit_note,
+                                      color: Colors.blue,
+                                      size: 28,
+                                    ),
+                                    onPressed: () => _editProduct(product),
+                                    tooltip: 'Edit',
+                                  ),
+                                  const SizedBox(width: 8),
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.delete_sweep,
+                                      color: Colors.red,
+                                      size: 28,
+                                    ),
+                                    onPressed: () =>
+                                        _confirmDeleteProduct(product),
+                                    tooltip: 'Delete',
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
             ),
           ),
         ],

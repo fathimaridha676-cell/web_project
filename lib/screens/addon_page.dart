@@ -15,6 +15,7 @@ class _AddonPageState extends State<AddonPage> {
   final TextEditingController _nameEnController = TextEditingController();
   final TextEditingController _nameArController = TextEditingController();
   final TextEditingController _priceController = TextEditingController();
+  String _searchQuery = '';
 
   Future<void> _saveAddon() async {
     if (_nameEnController.text.isEmpty || _nameArController.text.isEmpty) {
@@ -170,75 +171,102 @@ class _AddonPageState extends State<AddonPage> {
           // List Section
           Expanded(
             flex: 2,
-            child: StreamBuilder<QuerySnapshot>(
-              stream: _addonCollection.snapshots(),
-              builder: (context, snapshot) {
-                if (snapshot.hasError) return const Center(child: Text('Something went wrong'));
-                if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
-
-                final docs = snapshot.data!.docs.where((doc) {
-                  return (doc.data() as Map<String, dynamic>)['isDeleted'] != true;
-                }).toList();
-
-                if (docs.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.extension_off, size: 80, color: Colors.grey[300]),
-                        const SizedBox(height: 16),
-                        Text('No Add-ons found.', style: TextStyle(fontSize: 20, color: Colors.grey[500])),
-                      ],
-                    ),
-                  );
-                }
-
-                return ListView.builder(
-                  padding: const EdgeInsets.all(24),
-                  itemCount: docs.length,
-                  itemBuilder: (context, index) {
-                    final addon = AddonModel.fromMap(docs[index].data() as Map<String, dynamic>, docs[index].id);
-                    return Card(
-                      elevation: 3,
-                      margin: const EdgeInsets.only(bottom: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                      child: ListTile(
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                        leading: Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.teal.withOpacity(0.1),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.extension, color: Colors.teal),
-                        ),
-                        title: Text(addon.nameEn, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                        subtitle: Padding(
-                          padding: const EdgeInsets.only(top: 8.0),
-                          child: Text('Price: \$${addon.price.toStringAsFixed(2)}\nArabic: ${addon.nameAr}', style: TextStyle(color: Colors.grey[700])),
-                        ),
-                        isThreeLine: true,
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.edit_note, color: Colors.blue, size: 28),
-                              onPressed: () => _editAddon(addon),
-                              tooltip: 'Edit',
-                            ),
-                            const SizedBox(width: 8),
-                            IconButton(
-                              icon: const Icon(Icons.delete_sweep, color: Colors.red, size: 28),
-                              onPressed: () => _deleteAddon(addon),
-                              tooltip: 'Delete',
-                            ),
-                          ],
-                        ),
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(24.0).copyWith(bottom: 0),
+                  child: TextField(
+                    decoration: InputDecoration(
+                      hintText: 'Search add-ons...',
+                      prefixIcon: const Icon(Icons.search),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                    );
-                  },
-                );
-              },
+                    ),
+                    onChanged: (value) {
+                      setState(() {
+                        _searchQuery = value.toLowerCase();
+                      });
+                    },
+                  ),
+                ),
+                Expanded(
+                  child: StreamBuilder<QuerySnapshot>(
+                    stream: _addonCollection.snapshots(),
+                    builder: (context, snapshot) {
+                      if (snapshot.hasError) return const Center(child: Text('Something went wrong'));
+                      if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
+
+                      final docs = snapshot.data!.docs.where((doc) {
+                        final data = doc.data() as Map<String, dynamic>;
+                        final nameEn = (data['nameEn'] ?? '').toString().toLowerCase();
+                        final nameAr = (data['nameAr'] ?? '').toString().toLowerCase();
+                        final matchesSearch = nameEn.contains(_searchQuery) || nameAr.contains(_searchQuery);
+                        return data['isDeleted'] != true && matchesSearch;
+                      }).toList();
+
+                      if (docs.isEmpty) {
+                        return Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.extension_off, size: 80, color: Colors.grey[300]),
+                              const SizedBox(height: 16),
+                              Text('No Add-ons found.', style: TextStyle(fontSize: 20, color: Colors.grey[500])),
+                            ],
+                          ),
+                        );
+                      }
+
+                      return ListView.builder(
+                        padding: const EdgeInsets.all(24),
+                        itemCount: docs.length,
+                        itemBuilder: (context, index) {
+                          final addon = AddonModel.fromMap(docs[index].data() as Map<String, dynamic>, docs[index].id);
+                          return Card(
+                            elevation: 3,
+                            margin: const EdgeInsets.only(bottom: 16),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                            child: ListTile(
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                              leading: Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.teal.withOpacity(0.1),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.extension, color: Colors.teal),
+                              ),
+                              title: Text(addon.nameEn, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                              subtitle: Padding(
+                                padding: const EdgeInsets.only(top: 8.0),
+                                child: Text('Price: \$${addon.price.toStringAsFixed(2)}\nArabic: ${addon.nameAr}', style: TextStyle(color: Colors.grey[700])),
+                              ),
+                              isThreeLine: true,
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(Icons.edit_note, color: Colors.blue, size: 28),
+                                    onPressed: () => _editAddon(addon),
+                                    tooltip: 'Edit',
+                                  ),
+                                  const SizedBox(width: 8),
+                                  IconButton(
+                                    icon: const Icon(Icons.delete_sweep, color: Colors.red, size: 28),
+                                    onPressed: () => _deleteAddon(addon),
+                                    tooltip: 'Delete',
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
             ),
           ),
         ],
