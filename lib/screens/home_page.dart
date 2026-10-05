@@ -25,7 +25,11 @@ class HomePage extends StatelessWidget {
                   color: Colors.teal.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(Icons.restaurant_menu, color: Colors.teal, size: 28),
+                child: const Icon(
+                  Icons.restaurant_menu,
+                  color: Colors.teal,
+                  size: 28,
+                ),
               ),
               const SizedBox(width: 16),
               const Text(
@@ -46,7 +50,10 @@ class HomePage extends StatelessWidget {
             child: Row(
               children: [
                 IconButton(
-                  icon: const Icon(Icons.notifications_none_rounded, color: Color(0xFF64748B)),
+                  icon: const Icon(
+                    Icons.notifications_none_rounded,
+                    color: Color(0xFF64748B),
+                  ),
                   onPressed: () {},
                 ),
                 const SizedBox(width: 16),
@@ -64,7 +71,7 @@ class HomePage extends StatelessWidget {
                 ),
               ],
             ),
-          )
+          ),
         ],
       ),
       body: Center(
@@ -83,7 +90,10 @@ class HomePage extends StatelessWidget {
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(32),
                     gradient: const LinearGradient(
-                      colors: [Color(0xFF0F766E), Color(0xFF14B8A6)], // Sleek Teal gradients
+                      colors: [
+                        Color(0xFF0F766E),
+                        Color(0xFF14B8A6),
+                      ], // Sleek Teal gradients
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
@@ -92,7 +102,7 @@ class HomePage extends StatelessWidget {
                         color: const Color(0xFF14B8A6).withOpacity(0.3),
                         blurRadius: 30,
                         offset: const Offset(0, 15),
-                      )
+                      ),
                     ],
                   ),
                   child: Stack(
@@ -135,7 +145,7 @@ class HomePage extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 56),
-                
+
                 const Text(
                   'Dashboard Management',
                   style: TextStyle(
@@ -146,7 +156,7 @@ class HomePage extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 32),
-                
+
                 // Grid of Actions
                 LayoutBuilder(
                   builder: (context, constraints) {
@@ -154,7 +164,7 @@ class HomePage extends StatelessWidget {
                     if (constraints.maxWidth < 1000) crossAxisCount = 3;
                     if (constraints.maxWidth < 800) crossAxisCount = 2;
                     if (constraints.maxWidth < 500) crossAxisCount = 1;
-    
+
                     return GridView.count(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
@@ -168,32 +178,52 @@ class HomePage extends StatelessWidget {
                           subtitle: 'Organize your menu structure',
                           icon: Icons.category_rounded,
                           color: Colors.orange,
-                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CategoryPage())),
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const CategoryPage(),
+                            ),
+                          ),
                         ),
                         _HoverDashboardCard(
                           title: 'Products',
                           subtitle: 'Manage items & update prices',
                           icon: Icons.fastfood_rounded,
                           color: Colors.blue,
-                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProductPage())),
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const ProductPage(),
+                            ),
+                          ),
                         ),
                         _HoverDashboardCard(
                           title: 'Add-ons',
                           subtitle: 'Configure extra toppings & sides',
                           icon: Icons.extension_rounded,
                           color: Colors.teal,
-                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AddonPage())),
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const AddonPage(),
+                            ),
+                          ),
                         ),
                         _HoverDashboardCard(
                           title: 'Orders',
                           subtitle: 'Process & track incoming orders',
                           icon: Icons.receipt_long_rounded,
                           color: Colors.purple,
-                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const OrderPage())),
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const OrderPage(),
+                            ),
+                          ),
                         ),
                       ],
                     );
-                  }
+                  },
                 ),
               ],
             ),
@@ -244,8 +274,8 @@ class _HoverDashboardCardState extends State<_HoverDashboardCard> {
             border: Border.all(color: Colors.grey.shade100, width: 2),
             boxShadow: [
               BoxShadow(
-                color: _isHovered 
-                    ? widget.color.withOpacity(0.2) 
+                color: _isHovered
+                    ? widget.color.withOpacity(0.2)
                     : Colors.black.withOpacity(0.04),
                 blurRadius: _isHovered ? 30 : 15,
                 offset: _isHovered ? const Offset(0, 15) : const Offset(0, 8),
@@ -264,18 +294,20 @@ class _HoverDashboardCardState extends State<_HoverDashboardCard> {
                   decoration: BoxDecoration(
                     color: _isHovered ? widget.color : widget.color.shade50,
                     borderRadius: BorderRadius.circular(20),
-                    boxShadow: _isHovered ? [
-                      BoxShadow(
-                        color: widget.color.withOpacity(0.4),
-                        blurRadius: 12,
-                        offset: const Offset(0, 6),
-                      )
-                    ] : [],
+                    boxShadow: _isHovered
+                        ? [
+                            BoxShadow(
+                              color: widget.color.withOpacity(0.4),
+                              blurRadius: 12,
+                              offset: const Offset(0, 6),
+                            ),
+                          ]
+                        : [],
                   ),
                   child: Icon(
-                    widget.icon, 
-                    size: 40, 
-                    color: _isHovered ? Colors.white : widget.color.shade700
+                    widget.icon,
+                    size: 40,
+                    color: _isHovered ? Colors.white : widget.color.shade700,
                   ),
                 ),
                 const Spacer(),
