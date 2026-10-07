@@ -5,7 +5,7 @@ import 'addon_page.dart';
 import 'order_page.dart';
 import 'table_page.dart';
 import 'pos_page.dart';
-
+import 'sales_report_page.dart';
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
 
@@ -244,6 +244,18 @@ class HomePage extends StatelessWidget {
                             context,
                             MaterialPageRoute(
                               builder: (_) => const PosPage(),
+                            ),
+                          ),
+                        ),
+                        _HoverDashboardCard(
+                          title: 'Sales Report',
+                          subtitle: 'View revenue insights',
+                          icon: Icons.bar_chart_rounded,
+                          color: Colors.green,
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const SalesReportPage(),
                             ),
                           ),
                         ),
