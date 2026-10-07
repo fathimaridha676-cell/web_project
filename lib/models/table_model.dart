@@ -6,6 +6,7 @@ class TableModel {
   final String tableName;
   final int guestCount;
   final DocumentReference? reference;
+  List<dynamic> items;
 
   TableModel({
     required this.id,
@@ -13,6 +14,7 @@ class TableModel {
     required this.tableName,
     required this.guestCount,
     this.reference,
+    this.items = const [], // New items field
   });
 
   Map<String, dynamic> toMap() {
@@ -21,7 +23,8 @@ class TableModel {
       'tableNumber': tableNumber,
       'tableName': tableName,
       'guestCount': guestCount,
-      'reference': reference, // Storing the DocumentReference
+      'reference': reference,
+      'items': items,
     };
   }
 
@@ -32,6 +35,7 @@ class TableModel {
       tableName: map['tableName'] ?? '',
       guestCount: map['guestCount'] ?? 0,
       reference: reference ?? map['reference'],
+      items: List<dynamic>.from(map['items'] ?? []),
     );
   }
 }

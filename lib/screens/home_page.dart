@@ -4,6 +4,7 @@ import 'product_page.dart';
 import 'addon_page.dart';
 import 'order_page.dart';
 import 'table_page.dart';
+import 'pos_page.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
@@ -231,6 +232,18 @@ class HomePage extends StatelessWidget {
                             context,
                             MaterialPageRoute(
                               builder: (_) => const TablePage(),
+                            ),
+                          ),
+                        ),
+                        _HoverDashboardCard(
+                          title: 'POS System',
+                          subtitle: 'Point of sale interface',
+                          icon: Icons.point_of_sale_rounded,
+                          color: Colors.indigo,
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const PosPage(),
                             ),
                           ),
                         ),
