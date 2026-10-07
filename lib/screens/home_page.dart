@@ -6,6 +6,7 @@ import 'order_page.dart';
 import 'table_page.dart';
 import 'pos_page.dart';
 import 'sales_report_page.dart';
+import 'sales_history_page.dart';
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
 
@@ -256,6 +257,18 @@ class HomePage extends StatelessWidget {
                             context,
                             MaterialPageRoute(
                               builder: (_) => const SalesReportPage(),
+                            ),
+                          ),
+                        ),
+                        _HoverDashboardCard(
+                          title: 'Sales History',
+                          subtitle: 'View recent transactions',
+                          icon: Icons.history_rounded,
+                          color: Colors.cyan,
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const SalesHistoryPage(),
                             ),
                           ),
                         ),
