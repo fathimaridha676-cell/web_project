@@ -573,6 +573,22 @@ class _PosPageState extends State<PosPage> with SingleTickerProviderStateMixin {
     // Save order
     await _firestore.collection('orders').doc(orderId).set(orderData);
 
+    // Save to sales collection
+    final salesData = {
+      'orderId': orderId,
+      'displayOrderId': orderId,
+      'saleNumber': saleNumber,
+      'source': 'POS',
+      'orderType': _selectedOrderType,
+      'tableId': _selectedTable!.id,
+      'tableName': _selectedTable!.tableNumber, // assuming tableNumber contains the name
+      'totalAmount': totalAmount,
+      'cashAmount': paymentResult['cash'],
+      'creditAmount': paymentResult['credit'],
+      'timestamp': FieldValue.serverTimestamp(),
+    };
+    await _firestore.collection('sales').doc(orderId).set(salesData);
+
     // Update Counters
     final nextToken = _currentToken + 1;
     final nextTotal = _totalTokens + 1;
