@@ -3,6 +3,7 @@ import 'category_page.dart';
 import 'product_page.dart';
 import 'addon_page.dart';
 import 'order_page.dart';
+import 'table_page.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
@@ -218,6 +219,18 @@ class HomePage extends StatelessWidget {
                             context,
                             MaterialPageRoute(
                               builder: (_) => const OrderPage(),
+                            ),
+                          ),
+                        ),
+                        _HoverDashboardCard(
+                          title: 'Tables',
+                          subtitle: 'Manage dining tables',
+                          icon: Icons.table_restaurant_rounded,
+                          color: Colors.red,
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const TablePage(),
                             ),
                           ),
                         ),
