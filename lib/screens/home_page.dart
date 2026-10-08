@@ -11,6 +11,7 @@ import 'package:flutter/foundation.dart'; // Used to check if the platform is Wi
 import '../services/printer_service.dart'; // Helper to fetch and save printer config
 import 'package:flutter_thermal_printer/flutter_thermal_printer.dart';
 import 'package:flutter_thermal_printer/utils/printer.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
@@ -66,47 +67,115 @@ class HomePage extends StatelessWidget {
                     ),
                     onPressed: () async {
                       if (defaultTargetPlatform == TargetPlatform.android) {
-                        // --- ANDROID: Bluetooth Setup ---
+                        // --- ANDROID: Bluetooth & USB Setup ---
+                        
+                        // 1. Request Runtime Permissions
+                        // Android strictly requires these to be granted by the user at runtime
+                        // 1. Request Runtime Permissions
+                        await [
+                          Permission.location,
+                          Permission.bluetoothScan,
+                          Permission.bluetoothConnect,
+                        ].request();
+                        // 2. Start Scanning (Intelligent Fallback)
                         final plugin = FlutterThermalPrinter.instance;
-                        await plugin.getPrinters(connectionTypes: [ConnectionType.BLE]);
+                        
+                        // We run the scans in the background so the dialog can pop open immediately
+                        Future(() async {
+                          try {
+                            // 1. Scan for USB printers first. This is highly reliable.
+                            await plugin.getPrinters(connectionTypes: [ConnectionType.USB]);
+                          } catch (e) {
+                            print("DEBUG: USB Scan failed - $e");
+                          }
+                          
+                          // Wait for 1.5 seconds to allow the USB printer to be found and sent to the UI
+                          await Future.delayed(const Duration(milliseconds: 1500));
+                          
+                          try {
+                            // 2. Now attempt BLE. If this crashes (like on your iMin device), 
+                            // it won't affect the USB printer we already found!
+                            await plugin.getPrinters(connectionTypes: [ConnectionType.BLE]);
+                          } catch (e) {
+                            print("DEBUG: BLE Scan failed (Likely permission denied by OS) - $e");
+                          }
+                        });
 
                         if (context.mounted) {
                           showDialog(
                             context: context,
                             builder: (context) {
+                              // Local list to permanently store any printer we find, so they don't disappear!
+                              List<Printer> accumulatedPrinters = [];
+                              
                               return AlertDialog(
-                                title: const Text('Select Bluetooth Printer'),
+                                title: const Text('Select Printer (USB & Bluetooth)'),
                                 content: SizedBox(
                                   width: double.maxFinite,
                                   child: StreamBuilder<List<Printer>>(
                                     stream: plugin.devicesStream,
                                     builder: (context, snapshot) {
-                                      if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                                      // If the stream found printers, add them to our permanent list
+                                      if (snapshot.hasData && snapshot.data!.isNotEmpty) {
+                                        for (var p in snapshot.data!) {
+                                          // Ensure we don't add duplicates
+                                          if (!accumulatedPrinters.any((existing) => (existing.address == p.address && existing.vendorId == p.vendorId))) {
+                                            accumulatedPrinters.add(p);
+                                          }
+                                        }
+                                      }
+                                      
+                                      // If we haven't found ANY printers yet, show the loader
+                                      if (accumulatedPrinters.isEmpty) {
                                         return const Padding(
                                           padding: EdgeInsets.all(16.0),
                                           child: Center(child: CircularProgressIndicator()),
                                         );
                                       }
                                       
-                                      final printers = snapshot.data!;
+                                      final printers = accumulatedPrinters;
                                       return ListView.builder(
                                         shrinkWrap: true,
                                         itemCount: printers.length,
                                         itemBuilder: (context, index) {
                                           final printer = printers[index];
                                           return ListTile(
-                                            leading: const Icon(Icons.bluetooth),
+                                            leading: Icon(printer.connectionType == ConnectionType.USB ? Icons.usb : Icons.bluetooth),
                                             title: Text(printer.name ?? 'Unknown Device'),
-                                            subtitle: Text(printer.address ?? ''),
+                                            subtitle: Text(printer.connectionType == ConnectionType.USB ? 'USB Printer' : (printer.address ?? '')),
+                                            // --- NEW TEST BUTTON ---
+                                            trailing: TextButton.icon(
+                                              onPressed: () async {
+                                                // 1. Show loading state so the user knows it's doing something
+                                                ScaffoldMessenger.of(context).showSnackBar(
+                                                  SnackBar(content: Text('Testing ${printer.name}...')),
+                                                );
+                                                
+                                                // 2. Call the new test print function with the full printer object
+                                                final error = await PrinterService.testAndroidPrint(printer);
+                                                
+                                                if (context.mounted) {
+                                                  // 3. Display success or error
+                                                  if (error == null) {
+                                                    ScaffoldMessenger.of(context).showSnackBar(
+                                                      const SnackBar(content: Text('Test Print Successful!'), backgroundColor: Colors.green),
+                                                    );
+                                                  } else {
+                                                    ScaffoldMessenger.of(context).showSnackBar(
+                                                      SnackBar(content: Text(error), backgroundColor: Colors.red),
+                                                    );
+                                                  }
+                                                }
+                                              },
+                                              icon: const Icon(Icons.print, size: 18),
+                                              label: const Text('TEST'),
+                                            ),
                                             onTap: () async {
-                                              await PrinterService.setBluetoothPrinter(
-                                                printer.address ?? '', 
-                                                printer.name ?? 'Unknown'
-                                              );
+                                              await PrinterService.setAndroidPrinter(printer);
                                               if (context.mounted) {
                                                 Navigator.pop(context);
                                                 ScaffoldMessenger.of(context).showSnackBar(
-                                                  SnackBar(content: Text('Bluetooth Printer saved: ${printer.name}')),
+                                                  SnackBar(content: Text('Android Printer saved: ${printer.name}')),
                                                 );
                                               }
                                             },

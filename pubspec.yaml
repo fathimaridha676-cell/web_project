@@ -44,6 +44,7 @@ dependencies:
   screenshot: ^3.0.0
   image: ^4.1.7
   flutter_thermal_printer: ^2.3.0
+  permission_handler: ^13.0.2
 
 dev_dependencies:
   flutter_test:

@@ -744,8 +744,8 @@ class _PosPageState extends State<PosPage> with SingleTickerProviderStateMixin {
 
       // --- NEW PRINTING LOGIC USING STACK ---
       try {
-        final printerName = await PrinterService.getPrinterName();
-        if (printerName.isNotEmpty) {
+        final hasPrinter = await PrinterService.hasConfiguredPrinter();
+        if (hasPrinter) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Printing Receipt...')),
           );
@@ -765,22 +765,30 @@ class _PosPageState extends State<PosPage> with SingleTickerProviderStateMixin {
           // 3. Wait a frame for the hidden widget to render
           WidgetsBinding.instance.addPostFrameCallback((_) async {
             try {
-              // 4. Capture the built widget
+              // 4. Capture the built widget (Wait 800ms to ensure the Image.asset logo is fully decoded and painted)
               final Uint8List? capturedImage = await _screenshotController.capture(
-                delay: const Duration(milliseconds: 100),
+                delay: const Duration(milliseconds: 800),
                 pixelRatio: 2.0,
               );
 
               if (capturedImage != null) {
                 // 5. Convert and print
                 final List<int> printBytes = await OrderReceiptLayout.generateFromImageBytes(capturedImage);
-                await PrinterService.printBytes(printBytes, printerName);
+                
+                final printerName = await PrinterService.getPrinterName(); // Fallback for USB
+                final printError = await PrinterService.printBytes(printBytes, printerName: printerName);
+                
+                if (printError != null && mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(printError), backgroundColor: Colors.red, duration: const Duration(seconds: 5)),
+                  );
+                }
               }
             } catch (e) {
               print("Capture/Print Error: $e");
               if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Print Failed: $e')),
+                  SnackBar(content: Text('Print Failed: $e'), backgroundColor: Colors.red),
                 );
               }
             }

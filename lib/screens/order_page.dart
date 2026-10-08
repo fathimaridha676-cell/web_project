@@ -170,19 +170,20 @@ class _OrderPageState extends State<OrderPage> {
                                   icon: const Icon(Icons.print_rounded, color: Colors.grey),
                                   tooltip: 'Print Order',
                                   onPressed: () async {
-                                    // Fetch the configured printer name
-                                    String printerName = await PrinterService.getPrinterName();
+                                    // Check if ANY printer is configured
+                                    bool hasPrinter = await PrinterService.hasConfiguredPrinter();
                                     
                                     if (context.mounted) {
-                                      if (printerName.isNotEmpty) {
+                                      if (hasPrinter) {
                                         // Show loading indicator in a SnackBar
                                         ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(content: Text('Sending Order #${orderDoc.id.substring(0, 8).toUpperCase()} to $printerName...')),
+                                          SnackBar(content: Text('Sending Order #${orderDoc.id.substring(0, 8).toUpperCase()} to printer...')),
                                         );
                                         
                                         // Trigger the print job via the centralized service
                                         final List<int> receiptBytes = await OrderReceiptLayout.generate(data, orderDoc.id, context: context);
-                                        String? errorMsg = await PrinterService.printBytes(receiptBytes, printerName);
+                                        String printerName = await PrinterService.getPrinterName(); // Fallback for Windows
+                                        String? errorMsg = await PrinterService.printBytes(receiptBytes, printerName: printerName);
                                         
                                         if (context.mounted) {
                                           if (errorMsg == null) {
