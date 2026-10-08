@@ -4,10 +4,32 @@ import 'package:flutter_thermal_printer/flutter_thermal_printer.dart';
 import 'package:flutter_thermal_printer/utils/printer.dart';
 
 /// A centralized service to manage hardware printer connection and execution.
-/// This service is now "dumb": it does not care about receipt layouts.
 /// It only cares about taking an array of bytes and sending it to a printer.
 class PrinterService {
   static const String _printerKey = 'saved_printer_name';
+
+  // Android/Bluetooth Printer Keys
+  static const String _btMacKey = 'saved_bt_printer_mac';
+  static const String _btNameKey = 'saved_bt_printer_name';
+
+  /// Fetches the currently saved Android/Bluetooth printer MAC address.
+  static Future<String> getBluetoothMac() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_btMacKey) ?? '';
+  }
+
+  /// Fetches the currently saved Android/Bluetooth printer name.
+  static Future<String> getBluetoothName() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_btNameKey) ?? '';
+  }
+
+  /// Saves the Android/Bluetooth printer details for future print jobs.
+  static Future<void> setBluetoothPrinter(String mac, String name) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_btMacKey, mac);
+    await prefs.setString(_btNameKey, name);
+  }
 
   /// Fetches the currently saved printer name from local storage.
   static Future<String> getPrinterName() async {

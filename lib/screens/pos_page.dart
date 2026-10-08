@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:typed_data';
+import 'package:screenshot/screenshot.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/table_model.dart';
 import '../models/category_model.dart';
-// Assuming you have a ProductModel, if not we will read maps
-// import '../models/product_model.dart';
+import '../services/printer_service.dart';
+import '../utils/receipt_layout.dart';
+import '../widgets/pos_bill_widget.dart';
 
 class PosPage extends StatefulWidget {
   const PosPage({super.key});
@@ -30,6 +34,12 @@ class _PosPageState extends State<PosPage> with SingleTickerProviderStateMixin {
   late final Stream<QuerySnapshot> _tablesStream;
   late final Stream<QuerySnapshot> _categoriesStream;
   late final Stream<QuerySnapshot> _allProductsStream;
+
+  // For off-screen printing capture
+  final ScreenshotController _screenshotController = ScreenshotController();
+  Map<String, dynamic>? _printData;
+  String? _printOrderId;
+  int? _printToken;
 
   @override
   void initState() {
@@ -671,6 +681,9 @@ class _PosPageState extends State<PosPage> with SingleTickerProviderStateMixin {
     final paymentResult = await _showPaymentDialog(totalAmount);
     if (paymentResult == null) return; // User cancelled payment
 
+    // CAPTURE THE ITEMS HERE before the cart is cleared
+    final List<dynamic> currentCartItems = List.from(_selectedTable!.items);
+
     final orderData = {
       'orderId': orderId,
       'saleNumber': saleNumber,
@@ -678,7 +691,7 @@ class _PosPageState extends State<PosPage> with SingleTickerProviderStateMixin {
       'source': 'POS',
       'orderType': _selectedOrderType,
       'tableId': _selectedTable!.id,
-      'items': _selectedTable!.items,
+      'items': currentCartItems,
       'totalAmount': totalAmount,
       'cashAmount': paymentResult['cash'],
       'creditAmount': paymentResult['credit'],
@@ -728,6 +741,54 @@ class _PosPageState extends State<PosPage> with SingleTickerProviderStateMixin {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Checkout Complete: $orderId')));
+
+      // --- NEW PRINTING LOGIC USING STACK ---
+      try {
+        final printerName = await PrinterService.getPrinterName();
+        if (printerName.isNotEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Printing Receipt...')),
+          );
+
+          // 1. Prepare data
+          final printData = Map<String, dynamic>.from(salesData);
+          printData['createdAt'] = DateTime.now().toIso8601String();
+          printData['items'] = currentCartItems;
+
+          // 2. Set the state so the hidden widget builds
+          setState(() {
+            _printData = printData;
+            _printOrderId = orderId;
+            _printToken = nextToken;
+          });
+
+          // 3. Wait a frame for the hidden widget to render
+          WidgetsBinding.instance.addPostFrameCallback((_) async {
+            try {
+              // 4. Capture the built widget
+              final Uint8List? capturedImage = await _screenshotController.capture(
+                delay: const Duration(milliseconds: 100),
+                pixelRatio: 2.0,
+              );
+
+              if (capturedImage != null) {
+                // 5. Convert and print
+                final List<int> printBytes = await OrderReceiptLayout.generateFromImageBytes(capturedImage);
+                await PrinterService.printBytes(printBytes, printerName);
+              }
+            } catch (e) {
+              print("Capture/Print Error: $e");
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Print Failed: $e')),
+                );
+              }
+            }
+          });
+        }
+      } catch (e) {
+        print("Setup Print Error: $e");
+      }
     }
   }
 
@@ -744,8 +805,10 @@ class _PosPageState extends State<PosPage> with SingleTickerProviderStateMixin {
         elevation: 0,
         iconTheme: const IconThemeData(color: Color(0xFF1E293B)),
       ),
-      body: Row(
+      body: Stack(
         children: [
+          Row(
+            children: [
           // 1. Tables Section (Left)
           Container(
             width: 120,
@@ -1511,9 +1574,32 @@ class _PosPageState extends State<PosPage> with SingleTickerProviderStateMixin {
             ),
           ),
         ],
+          ),
+          
+          // --- HIDDEN RECEIPT FOR PRINTING ---
+          // Positioned far off-screen so it never intercepts touches or displays,
+          // but is technically mounted in the tree with unconstrained height bounds.
+          Positioned(
+            left: -5000,
+            top: -5000,
+            child: Screenshot(
+              controller: _screenshotController,
+              child: _printData != null ? Container(
+                width: 400,
+                color: Colors.white,
+                child: PosBillWidget(
+                  data: _printData!,
+                  orderId: _printOrderId ?? '',
+                  tokenNumber: _printToken,
+                ),
+              ) : const SizedBox.shrink(),
+            ),
+          ),
+        ],
       ),
     );
   }
+
 
   // Helper method for rendering the gorgeous product grid
   Widget _buildProductGrid(List<QueryDocumentSnapshot> products) {

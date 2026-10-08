@@ -229,6 +229,38 @@ class OrderReceiptLayout {
     }
   }
 
+  /// Public method to convert raw image bytes (e.g., from a widget screenshot)
+  /// directly into a complete, printable ESC/POS byte payload.
+  static Future<List<int>> generateFromImageBytes(Uint8List imageBytes) async {
+    // 1. Initialize generator for 80mm printer
+    final profile = await CapabilityProfile.load();
+    final generator = Generator(PaperSize.mm80, profile);
+    List<int> bytes = [];
+    
+    // Reset printer to clear any lingering styles
+    bytes += generator.reset();
+
+    // Decode the captured image
+    final img.Image? decoded = img.decodeImage(imageBytes);
+    if (decoded != null) {
+      // Resize for thermal printer compatibility (576 dots is standard for 80mm)
+      img.Image resized = img.copyResize(
+        decoded,
+        width: 576,
+        maintainAspect: true,
+      );
+
+      // Append image raster using our custom function
+      bytes.addAll(_imageToEscPosRaster(resized));
+    }
+
+    // Push the paper out and cut it
+    bytes += generator.feed(2);
+    bytes += generator.cut();
+
+    return bytes;
+  }
+
   /// Custom ESC/POS image raster generator to bypass the FixedLengthList exception in esc_pos_utils_plus
   static List<int> _imageToEscPosRaster(img.Image image) {
     List<int> bytes = [];

@@ -9,6 +9,8 @@ import 'sales_report_page.dart';
 import 'sales_history_page.dart';
 import 'package:flutter/foundation.dart'; // Used to check if the platform is Windows
 import '../services/printer_service.dart'; // Helper to fetch and save printer config
+import 'package:flutter_thermal_printer/flutter_thermal_printer.dart';
+import 'package:flutter_thermal_printer/utils/printer.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
@@ -55,23 +57,86 @@ class HomePage extends StatelessWidget {
             padding: const EdgeInsets.only(right: 32.0),
             child: Row(
               children: [
-                // Conditionally display the print icon only if the app is running on Windows
-                if (defaultTargetPlatform == TargetPlatform.windows)
+                // Conditionally display the print icon only if the app is running on Windows or Android
+                if (defaultTargetPlatform == TargetPlatform.windows || defaultTargetPlatform == TargetPlatform.android)
                   IconButton(
                     icon: const Icon(
                       Icons.print_rounded,
                       color: Color(0xFF64748B),
                     ),
                     onPressed: () async {
-                      // Fetch the currently saved printer name using our centralized service
-                      String currentPrinter = await PrinterService.getPrinterName();
+                      if (defaultTargetPlatform == TargetPlatform.android) {
+                        // --- ANDROID: Bluetooth Setup ---
+                        final plugin = FlutterThermalPrinter.instance;
+                        await plugin.getPrinters(connectionTypes: [ConnectionType.BLE]);
 
-                      // Use a TextEditingController to pre-fill the text field and get user input
-                      TextEditingController printerController =
-                          TextEditingController(text: currentPrinter);
+                        if (context.mounted) {
+                          showDialog(
+                            context: context,
+                            builder: (context) {
+                              return AlertDialog(
+                                title: const Text('Select Bluetooth Printer'),
+                                content: SizedBox(
+                                  width: double.maxFinite,
+                                  child: StreamBuilder<List<Printer>>(
+                                    stream: plugin.devicesStream,
+                                    builder: (context, snapshot) {
+                                      if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                                        return const Padding(
+                                          padding: EdgeInsets.all(16.0),
+                                          child: Center(child: CircularProgressIndicator()),
+                                        );
+                                      }
+                                      
+                                      final printers = snapshot.data!;
+                                      return ListView.builder(
+                                        shrinkWrap: true,
+                                        itemCount: printers.length,
+                                        itemBuilder: (context, index) {
+                                          final printer = printers[index];
+                                          return ListTile(
+                                            leading: const Icon(Icons.bluetooth),
+                                            title: Text(printer.name ?? 'Unknown Device'),
+                                            subtitle: Text(printer.address ?? ''),
+                                            onTap: () async {
+                                              await PrinterService.setBluetoothPrinter(
+                                                printer.address ?? '', 
+                                                printer.name ?? 'Unknown'
+                                              );
+                                              if (context.mounted) {
+                                                Navigator.pop(context);
+                                                ScaffoldMessenger.of(context).showSnackBar(
+                                                  SnackBar(content: Text('Bluetooth Printer saved: ${printer.name}')),
+                                                );
+                                              }
+                                            },
+                                          );
+                                        },
+                                      );
+                                    },
+                                  ),
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(context),
+                                    child: const Text('Cancel'),
+                                  ),
+                                ],
+                              );
+                            },
+                          );
+                        }
+                      } else {
+                        // --- WINDOWS: Network/USB Setup ---
+                        // Fetch the currently saved printer name using our centralized service
+                        String currentPrinter = await PrinterService.getPrinterName();
 
-                      // Ensure the widget is still mounted before showing the dialog after the async call
-                      if (context.mounted) {
+                        // Use a TextEditingController to pre-fill the text field and get user input
+                        TextEditingController printerController =
+                            TextEditingController(text: currentPrinter);
+
+                        // Ensure the widget is still mounted before showing the dialog after the async call
+                        if (context.mounted) {
                         showDialog(
                           context: context,
                           builder: (context) {
@@ -141,10 +206,11 @@ class HomePage extends StatelessWidget {
                           },
                         );
                       }
+                      }
                     },
                   ),
                 // Add spacing if the print icon is displayed
-                if (defaultTargetPlatform == TargetPlatform.windows)
+                if (defaultTargetPlatform == TargetPlatform.windows || defaultTargetPlatform == TargetPlatform.android)
                   const SizedBox(width: 16),
                 IconButton(
                   icon: const Icon(
