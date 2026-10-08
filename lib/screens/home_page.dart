@@ -7,6 +7,9 @@ import 'table_page.dart';
 import 'pos_page.dart';
 import 'sales_report_page.dart';
 import 'sales_history_page.dart';
+import 'package:flutter/foundation.dart'; // Used to check if the platform is Windows
+import '../services/printer_service.dart'; // Helper to fetch and save printer config
+
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
 
@@ -52,6 +55,97 @@ class HomePage extends StatelessWidget {
             padding: const EdgeInsets.only(right: 32.0),
             child: Row(
               children: [
+                // Conditionally display the print icon only if the app is running on Windows
+                if (defaultTargetPlatform == TargetPlatform.windows)
+                  IconButton(
+                    icon: const Icon(
+                      Icons.print_rounded,
+                      color: Color(0xFF64748B),
+                    ),
+                    onPressed: () async {
+                      // Fetch the currently saved printer name using our centralized service
+                      String currentPrinter = await PrinterService.getPrinterName();
+
+                      // Use a TextEditingController to pre-fill the text field and get user input
+                      TextEditingController printerController =
+                          TextEditingController(text: currentPrinter);
+
+                      // Ensure the widget is still mounted before showing the dialog after the async call
+                      if (context.mounted) {
+                        showDialog(
+                          context: context,
+                          builder: (context) {
+                            return AlertDialog(
+                              title: const Text('Printer Configuration'),
+                              content: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  // Explanatory text for the admin
+                                  const Text(
+                                    'Enter the name of the printer',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  TextField(
+                                    controller: printerController,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Printer Name',
+                                      border: OutlineInputBorder(),
+                                      hintText: 'e.g., EPSON_TM_T20II',
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              actions: [
+                                // Cancel button to dismiss without saving
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context),
+                                  child: const Text('Cancel'),
+                                ),
+                                // Save button to persist the value
+                                ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.teal,
+                                  ),
+                                  onPressed: () async {
+                                    // Save the new printer name using our centralized service
+                                    await PrinterService.setPrinterName(
+                                      printerController.text.trim(),
+                                    );
+                                    if (context.mounted) {
+                                      Navigator.pop(
+                                        context,
+                                      ); // Close the dialog
+                                      // Show a success message
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                            'Printer configured successfully!',
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  },
+                                  child: const Text(
+                                    'Save',
+                                    style: TextStyle(color: Colors.white),
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        );
+                      }
+                    },
+                  ),
+                // Add spacing if the print icon is displayed
+                if (defaultTargetPlatform == TargetPlatform.windows)
+                  const SizedBox(width: 16),
                 IconButton(
                   icon: const Icon(
                     Icons.notifications_none_rounded,
@@ -243,9 +337,7 @@ class HomePage extends StatelessWidget {
                           color: Colors.indigo,
                           onTap: () => Navigator.push(
                             context,
-                            MaterialPageRoute(
-                              builder: (_) => const PosPage(),
-                            ),
+                            MaterialPageRoute(builder: (_) => const PosPage()),
                           ),
                         ),
                         _HoverDashboardCard(

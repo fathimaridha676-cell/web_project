@@ -39,6 +39,11 @@ dependencies:
     sdk: flutter
   cloud_firestore: ^6.10.0
   intl: ^0.20.3
+  shared_preferences: ^2.5.6
+  esc_pos_utils_plus: ^2.0.3
+  screenshot: ^3.0.0
+  image: ^4.1.7
+  flutter_thermal_printer: ^2.3.0
 
 dev_dependencies:
   flutter_test:

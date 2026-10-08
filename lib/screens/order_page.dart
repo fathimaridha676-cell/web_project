@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter/foundation.dart'; // Used to check if platform is Windows/Android
+import '../services/printer_service.dart'; // Used to fetch the saved printer config
+import '../utils/receipt_layout.dart'; // Used to generate the PDF receipt layout
 
 class OrderPage extends StatefulWidget {
   const OrderPage({super.key});
@@ -158,27 +161,80 @@ class _OrderPageState extends State<OrderPage> {
                               ),
                             ],
                           ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: _getStatusColor(rawStatus).withOpacity(0.15),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.circle, size: 10, color: _getStatusColor(rawStatus)),
-                                const SizedBox(width: 8),
-                                Text(
-                                  displayStatus,
-                                  style: TextStyle(
-                                    color: _getStatusColor(rawStatus),
-                                    fontWeight: FontWeight.bold,
-                                    letterSpacing: 0.5,
-                                  ),
+                          Row(
+                            children: [
+                              // Conditionally display the print icon if the app is running on Windows or Android
+                              if (defaultTargetPlatform == TargetPlatform.windows ||
+                                  defaultTargetPlatform == TargetPlatform.android)
+                                IconButton(
+                                  icon: const Icon(Icons.print_rounded, color: Colors.grey),
+                                  tooltip: 'Print Order',
+                                  onPressed: () async {
+                                    // Fetch the configured printer name
+                                    String printerName = await PrinterService.getPrinterName();
+                                    
+                                    if (context.mounted) {
+                                      if (printerName.isNotEmpty) {
+                                        // Show loading indicator in a SnackBar
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(content: Text('Sending Order #${orderDoc.id.substring(0, 8).toUpperCase()} to $printerName...')),
+                                        );
+                                        
+                                        // Trigger the print job via the centralized service
+                                        final List<int> receiptBytes = await OrderReceiptLayout.generate(data, orderDoc.id, context: context);
+                                        String? errorMsg = await PrinterService.printBytes(receiptBytes, printerName);
+                                        
+                                        if (context.mounted) {
+                                          if (errorMsg == null) {
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              const SnackBar(content: Text('Print job sent successfully!'), backgroundColor: Colors.green),
+                                            );
+                                          } else {
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              SnackBar(
+                                                content: Text('Failed: $errorMsg'),
+                                                backgroundColor: Colors.red,
+                                                duration: const Duration(seconds: 5), // Keep it on screen longer to read
+                                              ),
+                                            );
+                                          }
+                                        }
+                                      } else {
+                                        // Show error if printer is not configured
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(
+                                            content: Text('No printer configured! Please set it up on the Home Page.'),
+                                            backgroundColor: Colors.red,
+                                          ),
+                                        );
+                                      }
+                                    }
+                                  },
                                 ),
-                              ],
-                            ),
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: _getStatusColor(rawStatus).withOpacity(0.15),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.circle, size: 10, color: _getStatusColor(rawStatus)),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      displayStatus,
+                                      style: TextStyle(
+                                        color: _getStatusColor(rawStatus),
+                                        fontWeight: FontWeight.bold,
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -265,10 +321,20 @@ class _OrderPageState extends State<OrderPage> {
                                   ),
                                   const Divider(height: 24),
                                   ...items.map((item) {
-                                    final title = item['title'] ?? 'Item';
+                                    final title = item['nameEn'] ?? item['title'] ?? 'Item';
                                     final qty = item['quantity'] ?? 1;
-                                    final price = item['price'] ?? 0;
-                                    final addons = (item['selectedAddons'] as List<dynamic>?) ?? [];
+                                    final double basePrice = (item['price'] as num?)?.toDouble() ?? 0.0;
+                                    final List<dynamic> addons = item['addons'] ?? item['selectedAddons'] ?? [];
+                                    
+                                    double addonsTotal = 0.0;
+                                    List<String> addonNames = [];
+                                    for (var addon in addons) {
+                                      addonsTotal += (addon['price'] as num?)?.toDouble() ?? 0.0;
+                                      String addonName = addon['nameEn'] ?? addon['title'] ?? 'Addon';
+                                      addonNames.add(addonName);
+                                    }
+                                    
+                                    final double finalPrice = basePrice + addonsTotal;
                                     
                                     return Padding(
                                       padding: const EdgeInsets.only(bottom: 12),
@@ -289,15 +355,15 @@ class _OrderPageState extends State<OrderPage> {
                                               crossAxisAlignment: CrossAxisAlignment.start,
                                               children: [
                                                 Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-                                                if (addons.isNotEmpty)
+                                                if (addonNames.isNotEmpty)
                                                   Padding(
                                                     padding: const EdgeInsets.only(top: 4),
-                                                    child: Text('+ ${addons.join(", ")}', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                                                    child: Text('+ ${addonNames.join(", ")}', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
                                                   ),
                                               ],
                                             ),
                                           ),
-                                          Text('\$${price.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                                          Text('\$${finalPrice.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold)),
                                         ],
                                       ),
                                     );
