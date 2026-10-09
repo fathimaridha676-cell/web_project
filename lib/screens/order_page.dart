@@ -15,8 +15,44 @@ class OrderPage extends StatefulWidget {
 class _OrderPageState extends State<OrderPage> {
   final _firestore = FirebaseFirestore.instance;
 
-  Future<void> _updateOrderStatus(DocumentReference docRef, String newStatus) async {
+  Future<void> _updateOrderStatus(
+    DocumentReference docRef,
+    String newStatus, [
+    //optional data parameter used for passing order data to the receipt generator
+    // it will be used when reciving order from customer app
+    Map<String, dynamic>? orderData,
+  ]) async {
     await docRef.update({'status': newStatus});
+
+    //if the customer app status delivered, moving the data to sales collection
+    if (newStatus == 'delivered' && orderData != null) {
+      final double totalAmount =
+          (orderData['totalAmount'] as num?)?.toDouble() ?? 0.0;
+      final String paymentMethod =
+          (orderData['paymentMethod']?.toString().toLowerCase() ?? '');
+      bool isCash = paymentMethod.contains('cash');
+
+      // SAFELY grab up to 6 characters for the ID
+      String shortId = docRef.id;
+      if (shortId.length > 6) {
+        shortId = shortId.substring(0, 6);
+      }
+
+      final salesData = {
+        'orderId': docRef.id,
+        'displayOrderId': docRef.id,
+        'saleNumber': 'APP-${shortId.toUpperCase()}',
+        'source': 'Customer App',
+        'orderType': orderData['orderType'] ?? 'Delivery',
+        'tableId': 'N/A',
+        'tableName': 'N/A',
+        'totalAmount': totalAmount,
+        'cashAmount': isCash ? totalAmount : 0.0,
+        'creditAmount': isCash ? 0.0 : totalAmount,
+        'timestamp': FieldValue.serverTimestamp(),
+      };
+      await _firestore.collection('sales').doc(docRef.id).set(salesData);
+    }
   }
 
   Widget _buildInfoRow(IconData icon, String text, {Color? iconColor}) {
@@ -46,19 +82,31 @@ class _OrderPageState extends State<OrderPage> {
           return const Center(child: CircularProgressIndicator());
         }
         if (snapshot.hasError) {
-          return Center(child: Text('Error loading orders: ${snapshot.error}', style: const TextStyle(color: Colors.red)));
+          return Center(
+            child: Text(
+              'Error loading orders: ${snapshot.error}',
+              style: const TextStyle(color: Colors.red),
+            ),
+          );
         }
-        
+
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
           return _buildEmptyState();
         }
 
+        //to not show the pos orders in order page
+
         var orders = snapshot.data!.docs.toList();
-        
+        orders = orders.where((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          return data['source'] != 'POS';
+        }).toList();
+
         if (filterStatus != null) {
           orders = orders.where((doc) {
             final data = doc.data() as Map<String, dynamic>;
-            final status = (data['status'] as String?)?.toLowerCase() ?? 'pending';
+            final status =
+                (data['status'] as String?)?.toLowerCase() ?? 'pending';
             return status == filterStatus.toLowerCase();
           }).toList();
         }
@@ -75,7 +123,7 @@ class _OrderPageState extends State<OrderPage> {
           if (aTime == null && bTime == null) return 0;
           if (aTime == null) return 1;
           if (bTime == null) return -1;
-          return bTime.compareTo(aTime); 
+          return bTime.compareTo(aTime);
         });
 
         return ListView.builder(
@@ -84,13 +132,16 @@ class _OrderPageState extends State<OrderPage> {
           itemBuilder: (context, index) {
             final orderDoc = orders[index];
             final data = orderDoc.data() as Map<String, dynamic>;
-            
+
             final String rawStatus = data['status'] ?? 'pending';
-            final String displayStatus = rawStatus[0].toUpperCase() + rawStatus.substring(1).toLowerCase();
-            
-            final double totalAmount = (data['totalAmount'] as num?)?.toDouble() ?? 0;
+            final String displayStatus =
+                rawStatus[0].toUpperCase() +
+                rawStatus.substring(1).toLowerCase();
+
+            final double totalAmount =
+                (data['totalAmount'] as num?)?.toDouble() ?? 0;
             final List<dynamic> items = data['items'] ?? [];
-            
+
             DateTime? createdAt;
             if (data['createdAt'] != null) {
               createdAt = (data['createdAt'] as Timestamp).toDate();
@@ -117,11 +168,17 @@ class _OrderPageState extends State<OrderPage> {
                   children: [
                     // Header Area
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 16,
+                      ),
                       decoration: BoxDecoration(
                         color: _getStatusColor(rawStatus).withOpacity(0.05),
                         border: Border(
-                          bottom: BorderSide(color: Colors.grey.shade100, width: 1.5),
+                          bottom: BorderSide(
+                            color: Colors.grey.shade100,
+                            width: 1.5,
+                          ),
                         ),
                       ),
                       child: Row(
@@ -139,10 +196,14 @@ class _OrderPageState extends State<OrderPage> {
                                       color: Colors.black.withOpacity(0.05),
                                       blurRadius: 4,
                                       offset: const Offset(0, 2),
-                                    )
-                                  ]
+                                    ),
+                                  ],
                                 ),
-                                child: Icon(Icons.receipt_long, color: Theme.of(context).primaryColor, size: 20),
+                                child: Icon(
+                                  Icons.receipt_long,
+                                  color: Theme.of(context).primaryColor,
+                                  size: 20,
+                                ),
                               ),
                               const SizedBox(width: 16),
                               Column(
@@ -150,12 +211,22 @@ class _OrderPageState extends State<OrderPage> {
                                 children: [
                                   Text(
                                     'Order #${orderDoc.id.substring(0, 8).toUpperCase()}',
-                                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                                    style: const TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    createdAt != null ? DateFormat('MMM d, yyyy - h:mm a').format(createdAt) : 'Unknown time',
-                                    style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                                    createdAt != null
+                                        ? DateFormat(
+                                            'MMM d, yyyy - h:mm a',
+                                          ).format(createdAt)
+                                        : 'Unknown time',
+                                    style: TextStyle(
+                                      color: Colors.grey.shade600,
+                                      fontSize: 13,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -164,47 +235,86 @@ class _OrderPageState extends State<OrderPage> {
                           Row(
                             children: [
                               // Conditionally display the print icon if the app is running on Windows or Android
-                              if (defaultTargetPlatform == TargetPlatform.windows ||
-                                  defaultTargetPlatform == TargetPlatform.android)
+                              if (defaultTargetPlatform ==
+                                      TargetPlatform.windows ||
+                                  defaultTargetPlatform ==
+                                      TargetPlatform.android)
                                 IconButton(
-                                  icon: const Icon(Icons.print_rounded, color: Colors.grey),
+                                  icon: const Icon(
+                                    Icons.print_rounded,
+                                    color: Colors.grey,
+                                  ),
                                   tooltip: 'Print Order',
                                   onPressed: () async {
                                     // Check if ANY printer is configured
-                                    bool hasPrinter = await PrinterService.hasConfiguredPrinter();
-                                    
+                                    bool hasPrinter =
+                                        await PrinterService.hasConfiguredPrinter();
+
                                     if (context.mounted) {
                                       if (hasPrinter) {
                                         // Show loading indicator in a SnackBar
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(content: Text('Sending Order #${orderDoc.id.substring(0, 8).toUpperCase()} to printer...')),
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              'Sending Order #${orderDoc.id.substring(0, 8).toUpperCase()} to printer...',
+                                            ),
+                                          ),
                                         );
-                                        
+
                                         // Trigger the print job via the centralized service
-                                        final List<int> receiptBytes = await OrderReceiptLayout.generate(data, orderDoc.id, context: context);
-                                        String printerName = await PrinterService.getPrinterName(); // Fallback for Windows
-                                        String? errorMsg = await PrinterService.printBytes(receiptBytes, printerName: printerName);
-                                        
+                                        final List<int> receiptBytes =
+                                            await OrderReceiptLayout.generate(
+                                              data,
+                                              orderDoc.id,
+                                              context: context,
+                                            );
+                                        String printerName =
+                                            await PrinterService.getPrinterName(); // Fallback for Windows
+                                        String? errorMsg =
+                                            await PrinterService.printBytes(
+                                              receiptBytes,
+                                              printerName: printerName,
+                                            );
+
                                         if (context.mounted) {
                                           if (errorMsg == null) {
-                                            ScaffoldMessenger.of(context).showSnackBar(
-                                              const SnackBar(content: Text('Print job sent successfully!'), backgroundColor: Colors.green),
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              const SnackBar(
+                                                content: Text(
+                                                  'Print job sent successfully!',
+                                                ),
+                                                backgroundColor: Colors.green,
+                                              ),
                                             );
                                           } else {
-                                            ScaffoldMessenger.of(context).showSnackBar(
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
                                               SnackBar(
-                                                content: Text('Failed: $errorMsg'),
+                                                content: Text(
+                                                  'Failed: $errorMsg',
+                                                ),
                                                 backgroundColor: Colors.red,
-                                                duration: const Duration(seconds: 5), // Keep it on screen longer to read
+                                                duration: const Duration(
+                                                  seconds: 5,
+                                                ), // Keep it on screen longer to read
                                               ),
                                             );
                                           }
                                         }
                                       } else {
                                         // Show error if printer is not configured
-                                        ScaffoldMessenger.of(context).showSnackBar(
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
                                           const SnackBar(
-                                            content: Text('No printer configured! Please set it up on the Home Page.'),
+                                            content: Text(
+                                              'No printer configured! Please set it up on the Home Page.',
+                                            ),
                                             backgroundColor: Colors.red,
                                           ),
                                         );
@@ -214,15 +324,24 @@ class _OrderPageState extends State<OrderPage> {
                                 ),
                               const SizedBox(width: 8),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 8,
+                                ),
                                 decoration: BoxDecoration(
-                                  color: _getStatusColor(rawStatus).withOpacity(0.15),
+                                  color: _getStatusColor(
+                                    rawStatus,
+                                  ).withOpacity(0.15),
                                   borderRadius: BorderRadius.circular(20),
                                 ),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Icon(Icons.circle, size: 10, color: _getStatusColor(rawStatus)),
+                                    Icon(
+                                      Icons.circle,
+                                      size: 10,
+                                      color: _getStatusColor(rawStatus),
+                                    ),
                                     const SizedBox(width: 8),
                                     Text(
                                       displayStatus,
@@ -240,7 +359,7 @@ class _OrderPageState extends State<OrderPage> {
                         ],
                       ),
                     ),
-                    
+
                     // Content Area
                     Padding(
                       padding: const EdgeInsets.all(24.0),
@@ -261,35 +380,72 @@ class _OrderPageState extends State<OrderPage> {
                                 children: [
                                   const Row(
                                     children: [
-                                      Icon(Icons.person, size: 20, color: Colors.teal),
+                                      Icon(
+                                        Icons.person,
+                                        size: 20,
+                                        color: Colors.teal,
+                                      ),
                                       SizedBox(width: 8),
-                                      Text('Customer Details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                                      Text(
+                                        'Customer Details',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 16,
+                                        ),
+                                      ),
                                     ],
                                   ),
                                   const Divider(height: 24),
-                                  _buildInfoRow(Icons.badge_outlined, data['customerName'] ?? 'N/A'),
-                                  _buildInfoRow(Icons.phone_outlined, data['phone'] ?? 'N/A'),
-                                  _buildInfoRow(Icons.location_on_outlined, data['address'] ?? 'N/A'),
-                                  _buildInfoRow(Icons.credit_card_outlined, data['paymentMethod'] ?? 'N/A'),
-                                  if (data['note'] != null && data['note'].toString().trim().isNotEmpty) ...[
+                                  _buildInfoRow(
+                                    Icons.badge_outlined,
+                                    data['customerName'] ?? 'N/A',
+                                  ),
+                                  _buildInfoRow(
+                                    Icons.phone_outlined,
+                                    data['phone'] ?? 'N/A',
+                                  ),
+                                  _buildInfoRow(
+                                    Icons.location_on_outlined,
+                                    data['address'] ?? 'N/A',
+                                  ),
+                                  _buildInfoRow(
+                                    Icons.credit_card_outlined,
+                                    data['paymentMethod'] ?? 'N/A',
+                                  ),
+                                  if (data['note'] != null &&
+                                      data['note']
+                                          .toString()
+                                          .trim()
+                                          .isNotEmpty) ...[
                                     const SizedBox(height: 8),
                                     Container(
                                       padding: const EdgeInsets.all(12),
                                       decoration: BoxDecoration(
                                         color: Colors.orange.shade50,
                                         borderRadius: BorderRadius.circular(12),
-                                        border: Border.all(color: Colors.orange.shade200),
+                                        border: Border.all(
+                                          color: Colors.orange.shade200,
+                                        ),
                                       ),
                                       child: Row(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
-                                          Icon(Icons.note_alt_outlined, size: 18, color: Colors.orange.shade800),
+                                          Icon(
+                                            Icons.note_alt_outlined,
+                                            size: 18,
+                                            color: Colors.orange.shade800,
+                                          ),
                                           const SizedBox(width: 8),
                                           Expanded(
                                             child: Text(
-                                              data['note'], 
-                                              style: TextStyle(color: Colors.orange.shade900, fontSize: 13, fontWeight: FontWeight.w500)
-                                            )
+                                              data['note'],
+                                              style: TextStyle(
+                                                color: Colors.orange.shade900,
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
                                           ),
                                         ],
                                       ),
@@ -300,7 +456,7 @@ class _OrderPageState extends State<OrderPage> {
                             ),
                           ),
                           const SizedBox(width: 24),
-                          
+
                           // Order Items Column
                           Expanded(
                             child: Container(
@@ -315,56 +471,116 @@ class _OrderPageState extends State<OrderPage> {
                                 children: [
                                   const Row(
                                     children: [
-                                      Icon(Icons.fastfood_outlined, size: 20, color: Colors.teal),
+                                      Icon(
+                                        Icons.fastfood_outlined,
+                                        size: 20,
+                                        color: Colors.teal,
+                                      ),
                                       SizedBox(width: 8),
-                                      Text('Order Items', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                                      Text(
+                                        'Order Items',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 16,
+                                        ),
+                                      ),
                                     ],
                                   ),
                                   const Divider(height: 24),
                                   ...items.map((item) {
-                                    final title = item['nameEn'] ?? item['title'] ?? 'Item';
+                                    final title =
+                                        item['nameEn'] ??
+                                        item['title'] ??
+                                        'Item';
                                     final qty = item['quantity'] ?? 1;
-                                    final double basePrice = (item['price'] as num?)?.toDouble() ?? 0.0;
-                                    final List<dynamic> addons = item['addons'] ?? item['selectedAddons'] ?? [];
-                                    
+                                    final double basePrice =
+                                        (item['price'] as num?)?.toDouble() ??
+                                        0.0;
+                                    final List<dynamic> addons =
+                                        item['addons'] ??
+                                        item['selectedAddons'] ??
+                                        [];
+
                                     double addonsTotal = 0.0;
                                     List<String> addonNames = [];
                                     for (var addon in addons) {
-                                      addonsTotal += (addon['price'] as num?)?.toDouble() ?? 0.0;
-                                      String addonName = addon['nameEn'] ?? addon['title'] ?? 'Addon';
+                                      addonsTotal +=
+                                          (addon['price'] as num?)
+                                              ?.toDouble() ??
+                                          0.0;
+                                      String addonName =
+                                          addon['nameEn'] ??
+                                          addon['title'] ??
+                                          'Addon';
                                       addonNames.add(addonName);
                                     }
-                                    
-                                    final double finalPrice = basePrice + addonsTotal;
-                                    
+
+                                    final double finalPrice =
+                                        basePrice + addonsTotal;
+
                                     return Padding(
-                                      padding: const EdgeInsets.only(bottom: 12),
+                                      padding: const EdgeInsets.only(
+                                        bottom: 12,
+                                      ),
                                       child: Row(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
                                           Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 4,
+                                            ),
                                             decoration: BoxDecoration(
                                               color: Colors.teal.shade50,
-                                              borderRadius: BorderRadius.circular(6),
+                                              borderRadius:
+                                                  BorderRadius.circular(6),
                                             ),
-                                            child: Text('${qty}x', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.teal.shade800)),
+                                            child: Text(
+                                              '${qty}x',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.teal.shade800,
+                                              ),
+                                            ),
                                           ),
                                           const SizedBox(width: 12),
                                           Expanded(
                                             child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
                                               children: [
-                                                Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+                                                Text(
+                                                  title,
+                                                  style: const TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
                                                 if (addonNames.isNotEmpty)
                                                   Padding(
-                                                    padding: const EdgeInsets.only(top: 4),
-                                                    child: Text('+ ${addonNames.join(", ")}', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                                                    padding:
+                                                        const EdgeInsets.only(
+                                                          top: 4,
+                                                        ),
+                                                    child: Text(
+                                                      '+ ${addonNames.join(", ")}',
+                                                      style: TextStyle(
+                                                        fontSize: 12,
+                                                        color: Colors
+                                                            .grey
+                                                            .shade600,
+                                                      ),
+                                                    ),
                                                   ),
                                               ],
                                             ),
                                           ),
-                                          Text('\$${finalPrice.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                                          Text(
+                                            '\$${finalPrice.toStringAsFixed(2)}',
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
                                         ],
                                       ),
                                     );
@@ -374,7 +590,7 @@ class _OrderPageState extends State<OrderPage> {
                             ),
                           ),
                           const SizedBox(width: 24),
-                          
+
                           // Total Column
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.end,
@@ -382,18 +598,34 @@ class _OrderPageState extends State<OrderPage> {
                               Container(
                                 padding: const EdgeInsets.all(16),
                                 decoration: BoxDecoration(
-                                  color: Theme.of(context).primaryColor.withOpacity(0.05),
+                                  color: Theme.of(
+                                    context,
+                                  ).primaryColor.withOpacity(0.05),
                                   borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(color: Theme.of(context).primaryColor.withOpacity(0.2)),
+                                  border: Border.all(
+                                    color: Theme.of(
+                                      context,
+                                    ).primaryColor.withOpacity(0.2),
+                                  ),
                                 ),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.end,
                                   children: [
-                                    Text('Total Amount', style: TextStyle(color: Colors.grey.shade700, fontWeight: FontWeight.w500)),
+                                    Text(
+                                      'Total Amount',
+                                      style: TextStyle(
+                                        color: Colors.grey.shade700,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
                                     const SizedBox(height: 8),
                                     Text(
                                       '\$${totalAmount.toStringAsFixed(2)}',
-                                      style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Theme.of(context).primaryColor),
+                                      style: TextStyle(
+                                        fontSize: 28,
+                                        fontWeight: FontWeight.bold,
+                                        color: Theme.of(context).primaryColor,
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -403,16 +635,26 @@ class _OrderPageState extends State<OrderPage> {
                         ],
                       ),
                     ),
-                    
+
                     // Action Buttons Area
-                    if (filterStatus != null && filterStatus != 'all' && rawStatus.toLowerCase() != 'delivered' && rawStatus.toLowerCase() != 'rejected') ...[
+                    if (filterStatus != null &&
+                        filterStatus != 'all' &&
+                        rawStatus.toLowerCase() != 'delivered' &&
+                        rawStatus.toLowerCase() != 'rejected') ...[
                       const Divider(height: 1),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 16,
+                        ),
                         color: Colors.grey.shade50,
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.end,
-                          children: _buildActionButtons(orderDoc.reference, rawStatus),
+                          children: _buildActionButtons(
+                            orderDoc.reference,
+                            rawStatus,
+                            data,
+                          ),
                         ),
                       ),
                     ],
@@ -437,12 +679,20 @@ class _OrderPageState extends State<OrderPage> {
               color: Colors.teal.shade50,
               shape: BoxShape.circle,
             ),
-            child: Icon(Icons.receipt_long_outlined, size: 64, color: Colors.teal.shade300),
+            child: Icon(
+              Icons.receipt_long_outlined,
+              size: 64,
+              color: Colors.teal.shade300,
+            ),
           ),
           const SizedBox(height: 24),
           Text(
             'No orders found',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.grey.shade800),
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey.shade800,
+            ),
           ),
           const SizedBox(height: 8),
           Text(
@@ -471,7 +721,11 @@ class _OrderPageState extends State<OrderPage> {
     }
   }
 
-  List<Widget> _buildActionButtons(DocumentReference docRef, String status) {
+  List<Widget> _buildActionButtons(
+    DocumentReference docRef,
+    String status,
+    Map<String, dynamic> data,
+  ) {
     if (status.toLowerCase() == 'pending') {
       return [
         TextButton.icon(
@@ -481,7 +735,9 @@ class _OrderPageState extends State<OrderPage> {
           style: TextButton.styleFrom(
             foregroundColor: Colors.red,
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
           ),
         ),
         const SizedBox(width: 16),
@@ -494,7 +750,9 @@ class _OrderPageState extends State<OrderPage> {
             foregroundColor: Colors.white,
             elevation: 0,
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
           ),
         ),
       ];
@@ -509,14 +767,16 @@ class _OrderPageState extends State<OrderPage> {
             foregroundColor: Colors.white,
             elevation: 0,
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
           ),
         ),
       ];
     } else if (status.toLowerCase() == 'ready') {
       return [
         ElevatedButton.icon(
-          onPressed: () => _updateOrderStatus(docRef, 'delivered'),
+          onPressed: () => _updateOrderStatus(docRef, 'delivered', data),
           icon: const Icon(Icons.local_shipping_outlined),
           label: const Text('Mark as Delivered'),
           style: ElevatedButton.styleFrom(
@@ -524,7 +784,9 @@ class _OrderPageState extends State<OrderPage> {
             foregroundColor: Colors.white,
             elevation: 0,
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
           ),
         ),
       ];
@@ -540,7 +802,14 @@ class _OrderPageState extends State<OrderPage> {
         backgroundColor: Colors.grey.shade50,
         appBar: AppBar(
           toolbarHeight: 80,
-          title: const Text('Manage Orders', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 24)),
+          title: const Text(
+            'Manage Orders',
+            style: TextStyle(
+              color: Colors.black87,
+              fontWeight: FontWeight.bold,
+              fontSize: 24,
+            ),
+          ),
           backgroundColor: Colors.white,
           elevation: 0,
           iconTheme: const IconThemeData(color: Colors.black87),
@@ -552,7 +821,10 @@ class _OrderPageState extends State<OrderPage> {
               ),
               child: TabBar(
                 isScrollable: true,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
                 indicatorSize: TabBarIndicatorSize.tab,
                 indicator: BoxDecoration(
                   borderRadius: BorderRadius.circular(50),
@@ -560,8 +832,14 @@ class _OrderPageState extends State<OrderPage> {
                 ),
                 labelColor: Colors.white,
                 unselectedLabelColor: Colors.grey.shade600,
-                labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 15),
+                labelStyle: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                ),
+                unselectedLabelStyle: const TextStyle(
+                  fontWeight: FontWeight.w500,
+                  fontSize: 15,
+                ),
                 tabs: const [
                   Tab(text: '   All Orders   '),
                   Tab(text: '   Pending   '),

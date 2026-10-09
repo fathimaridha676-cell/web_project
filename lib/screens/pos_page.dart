@@ -490,122 +490,134 @@ class _PosPageState extends State<PosPage> with SingleTickerProviderStateMixin {
               ),
               content: SizedBox(
                 width: 400,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade100,
-                        borderRadius: BorderRadius.circular(8),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Total Amount',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Text(
+                              '\$${totalAmount.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                      child: Row(
+                      const SizedBox(height: 24),
+                      TextField(
+                        controller: cashController,
+                        readOnly: !cashEditable,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: InputDecoration(
+                          labelText: 'Cash',
+                          prefixIcon: const Icon(Icons.money),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(
+                              color: Colors.orange,
+                              width: 2,
+                            ),
+                          ),
+                        ),
+                        onChanged: (val) => updateBalance(),
+                        onTap: () {
+                          if (!cashEditable) {
+                            // Automatically fill with total amount if the field is empty
+                            if (cashController.text.isEmpty && balance > 0) {
+                              cashController.text = balance.toStringAsFixed(2);
+                              updateBalance();
+                            }
+                            //unlock the field for next tap
+                            setStateSB(() => cashEditable = true);
+                            //hides the keyboard that pops up
+                            FocusManager.instance.primaryFocus?.unfocus();
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: creditController,
+                        readOnly: !creditEditable,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: InputDecoration(
+                          labelText: 'Credit',
+                          prefixIcon: const Icon(Icons.credit_card),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(
+                              color: Colors.orange,
+                              width: 2,
+                            ),
+                          ),
+                        ),
+                        onChanged: (val) => updateBalance(),
+                        onTap: () {
+                          if (!creditEditable) {
+                            // Automatically fill with total amount if the field is empty
+                            if (creditController.text.isEmpty && balance > 0) {
+                              creditController.text = balance.toStringAsFixed(
+                                2,
+                              );
+                              updateBalance();
+                            }
+                            //unlock the field for next tap
+                            setStateSB(() => creditEditable = true);
+                            //hides the keyboard that pops up
+                            FocusManager.instance.primaryFocus?.unfocus();
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 24),
+                      Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text(
-                            'Total Amount',
-                            style: TextStyle(
+                          Text(
+                            balance < 0 ? 'Change Due' : 'Balance',
+                            style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
                           Text(
-                            '\$${totalAmount.toStringAsFixed(2)}',
-                            style: const TextStyle(
+                            '\$${balance.abs().toStringAsFixed(2)}',
+                            style: TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
-                              color: Colors.black,
+                              color: balance <= 0 ? Colors.green : Colors.red,
                             ),
                           ),
                         ],
                       ),
-                    ),
-                    const SizedBox(height: 24),
-                    TextField(
-                      controller: cashController,
-                      readOnly: !cashEditable,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      decoration: InputDecoration(
-                        labelText: 'Cash',
-                        prefixIcon: const Icon(Icons.money),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(
-                            color: Colors.orange,
-                            width: 2,
-                          ),
-                        ),
-                      ),
-                      onChanged: (val) => updateBalance(),
-                      onTap: () {
-                        if (!cashEditable) {
-                          if (cashController.text.isEmpty && balance > 0) {
-                            cashController.text = balance.toStringAsFixed(2);
-                            updateBalance();
-                          }
-                          setStateSB(() => cashEditable = true);
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: creditController,
-                      readOnly: !creditEditable,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      decoration: InputDecoration(
-                        labelText: 'Credit',
-                        prefixIcon: const Icon(Icons.credit_card),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(
-                            color: Colors.orange,
-                            width: 2,
-                          ),
-                        ),
-                      ),
-                      onChanged: (val) => updateBalance(),
-                      onTap: () {
-                        if (!creditEditable) {
-                          if (creditController.text.isEmpty && balance > 0) {
-                            creditController.text = balance.toStringAsFixed(2);
-                            updateBalance();
-                          }
-                          setStateSB(() => creditEditable = true);
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 24),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          balance < 0 ? 'Change Due' : 'Balance',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        Text(
-                          '\$${balance.abs().toStringAsFixed(2)}',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: balance <= 0 ? Colors.green : Colors.red,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
               actions: [
@@ -746,9 +758,9 @@ class _PosPageState extends State<PosPage> with SingleTickerProviderStateMixin {
       try {
         final hasPrinter = await PrinterService.hasConfiguredPrinter();
         if (hasPrinter) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Printing Receipt...')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('Printing Receipt...')));
 
           // 1. Prepare data
           final printData = Map<String, dynamic>.from(salesData);
@@ -766,21 +778,33 @@ class _PosPageState extends State<PosPage> with SingleTickerProviderStateMixin {
           WidgetsBinding.instance.addPostFrameCallback((_) async {
             try {
               // 4. Capture the built widget (Wait 800ms to ensure the Image.asset logo is fully decoded and painted)
-              final Uint8List? capturedImage = await _screenshotController.capture(
-                delay: const Duration(milliseconds: 800),
-                pixelRatio: 2.0,
-              );
+              final Uint8List? capturedImage = await _screenshotController
+                  .capture(
+                    delay: const Duration(milliseconds: 800),
+                    pixelRatio: 2.0,
+                  );
 
               if (capturedImage != null) {
                 // 5. Convert and print
-                final List<int> printBytes = await OrderReceiptLayout.generateFromImageBytes(capturedImage);
-                
-                final printerName = await PrinterService.getPrinterName(); // Fallback for USB
-                final printError = await PrinterService.printBytes(printBytes, printerName: printerName);
-                
+                final List<int> printBytes =
+                    await OrderReceiptLayout.generateFromImageBytes(
+                      capturedImage,
+                    );
+
+                final printerName =
+                    await PrinterService.getPrinterName(); // Fallback for USB
+                final printError = await PrinterService.printBytes(
+                  printBytes,
+                  printerName: printerName,
+                );
+
                 if (printError != null && mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(printError), backgroundColor: Colors.red, duration: const Duration(seconds: 5)),
+                    SnackBar(
+                      content: Text(printError),
+                      backgroundColor: Colors.red,
+                      duration: const Duration(seconds: 5),
+                    ),
                   );
                 }
               }
@@ -788,7 +812,10 @@ class _PosPageState extends State<PosPage> with SingleTickerProviderStateMixin {
               print("Capture/Print Error: $e");
               if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Print Failed: $e'), backgroundColor: Colors.red),
+                  SnackBar(
+                    content: Text('Print Failed: $e'),
+                    backgroundColor: Colors.red,
+                  ),
                 );
               }
             }
@@ -817,773 +844,799 @@ class _PosPageState extends State<PosPage> with SingleTickerProviderStateMixin {
         children: [
           Row(
             children: [
-          // 1. Tables Section (Left)
-          Container(
-            width: 120,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              border: Border(right: BorderSide(color: Colors.grey[200]!)),
-            ),
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: ElevatedButton(
-                    onPressed: _addTableDirectly,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.orange,
-                      minimumSize: const Size(double.infinity, 40),
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+              // 1. Tables Section (Left)
+              Container(
+                width: 120,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  border: Border(right: BorderSide(color: Colors.grey[200]!)),
+                ),
+                child: Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: ElevatedButton(
+                        onPressed: _addTableDirectly,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.orange,
+                          minimumSize: const Size(double.infinity, 40),
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: const Icon(Icons.add, color: Colors.white),
                       ),
                     ),
-                    child: const Icon(Icons.add, color: Colors.white),
-                  ),
-                ),
-                Expanded(
-                  child: StreamBuilder<QuerySnapshot>(
-                    stream: _tablesStream,
-                    builder: (context, snapshot) {
-                      if (!snapshot.hasData)
-                        return const Center(child: CircularProgressIndicator());
-                      final tables = snapshot.data!.docs;
+                    Expanded(
+                      child: StreamBuilder<QuerySnapshot>(
+                        stream: _tablesStream,
+                        builder: (context, snapshot) {
+                          if (!snapshot.hasData)
+                            return const Center(
+                              child: CircularProgressIndicator(),
+                            );
+                          final tables = snapshot.data!.docs;
 
-                      if (_selectedTable == null && tables.isNotEmpty) {
-                        WidgetsBinding.instance.addPostFrameCallback((_) {
-                          if (mounted) {
-                            final tData =
-                                tables.first.data() as Map<String, dynamic>;
-                            setState(() {
-                              _selectedTable = TableModel.fromMap(
-                                tData,
-                                tables.first.id,
-                                reference: tables.first.reference,
-                              );
+                          if (_selectedTable == null && tables.isNotEmpty) {
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              if (mounted) {
+                                final tData =
+                                    tables.first.data() as Map<String, dynamic>;
+                                setState(() {
+                                  _selectedTable = TableModel.fromMap(
+                                    tData,
+                                    tables.first.id,
+                                    reference: tables.first.reference,
+                                  );
+                                });
+                              }
                             });
                           }
-                        });
-                      }
 
-                      return ListView.builder(
-                        itemCount: tables.length,
-                        itemBuilder: (context, index) {
-                          final tData =
-                              tables[index].data() as Map<String, dynamic>;
-                          final table = TableModel.fromMap(
-                            tData,
-                            tables[index].id,
-                            reference: tables[index].reference,
-                          );
+                          return ListView.builder(
+                            itemCount: tables.length,
+                            itemBuilder: (context, index) {
+                              final tData =
+                                  tables[index].data() as Map<String, dynamic>;
+                              final table = TableModel.fromMap(
+                                tData,
+                                tables[index].id,
+                                reference: tables[index].reference,
+                              );
 
-                          // We intentionally do not auto-sync via toString()
-                          // to prevent double-render glitches during local edits.
+                              // We intentionally do not auto-sync via toString()
+                              // to prevent double-render glitches during local edits.
 
-                          final isSelected = _selectedTable?.id == table.id;
-                          return InkWell(
-                            onTap: () => setState(() => _selectedTable = table),
-                            child: Container(
-                              margin: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
-                              ),
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: isSelected
-                                    ? Colors.orange
-                                    : Colors.grey[100],
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Center(
-                                child: Text(
-                                  table.tableNumber,
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 18,
+                              final isSelected = _selectedTable?.id == table.id;
+                              return InkWell(
+                                onTap: () =>
+                                    setState(() => _selectedTable = table),
+                                child: Container(
+                                  margin: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
                                     color: isSelected
-                                        ? Colors.white
-                                        : Colors.black87,
+                                        ? Colors.orange
+                                        : Colors.grey[100],
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      table.tableNumber,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 18,
+                                        color: isSelected
+                                            ? Colors.white
+                                            : Colors.black87,
+                                      ),
+                                    ),
                                   ),
                                 ),
-                              ),
-                            ),
+                              );
+                            },
                           );
                         },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // 2. Products & Categories Section (Middle)
+              Expanded(
+                flex: 3,
+                child: StreamBuilder<QuerySnapshot>(
+                  stream: _categoriesStream,
+                  builder: (context, catSnapshot) {
+                    if (catSnapshot.hasError) {
+                      print("Category Stream Error: ${catSnapshot.error}");
+                      return Center(child: Text('Error: ${catSnapshot.error}'));
+                    }
+                    if (!catSnapshot.hasData)
+                      return const SizedBox(
+                        height: 50,
+                        child: Center(child: CircularProgressIndicator()),
                       );
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ),
+                    final categories = catSnapshot.data!.docs;
 
-          // 2. Products & Categories Section (Middle)
-          Expanded(
-            flex: 3,
-            child: StreamBuilder<QuerySnapshot>(
-              stream: _categoriesStream,
-              builder: (context, catSnapshot) {
-                if (catSnapshot.hasError) {
-                  print("Category Stream Error: ${catSnapshot.error}");
-                  return Center(child: Text('Error: ${catSnapshot.error}'));
-                }
-                if (!catSnapshot.hasData)
-                  return const SizedBox(
-                    height: 50,
-                    child: Center(child: CircularProgressIndicator()),
-                  );
-                final categories = catSnapshot.data!.docs;
+                    if (categories.isEmpty)
+                      return const SizedBox(
+                        height: 50,
+                        child: Center(child: Text('No Categories')),
+                      );
 
-                if (categories.isEmpty)
-                  return const SizedBox(
-                    height: 50,
-                    child: Center(child: Text('No Categories')),
-                  );
-
-                return DefaultTabController(
-                  length: categories.length + 1,
-                  child: Column(
-                    children: [
-                      Container(
-                        margin: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.orange,
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.orange.withOpacity(0.3),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
+                    return DefaultTabController(
+                      length: categories.length + 1,
+                      child: Column(
+                        children: [
+                          Container(
+                            margin: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
                             ),
-                          ],
-                        ),
-                        child: TabBar(
-                          dividerColor: Colors.transparent,
-                          labelColor: Colors.white,
-                          unselectedLabelColor: Colors.white70,
-                          indicatorColor: Colors.white,
-                          indicatorWeight: 4,
-                          indicatorSize: TabBarIndicatorSize.tab,
-                          tabs: [
-                            const Tab(
-                              child: Text(
-                                'All',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
+                            decoration: BoxDecoration(
+                              color: Colors.orange,
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.orange.withOpacity(0.3),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
                                 ),
-                              ),
+                              ],
                             ),
-                            ...categories.map((c) {
-                              final data = c.data() as Map<String, dynamic>;
-                              return Tab(
-                                child: Text(
-                                  data['nameEn'],
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
+                            child: TabBar(
+                              dividerColor: Colors.transparent,
+                              labelColor: Colors.white,
+                              unselectedLabelColor: Colors.white70,
+                              indicatorColor: Colors.white,
+                              indicatorWeight: 4,
+                              indicatorSize: TabBarIndicatorSize.tab,
+                              tabs: [
+                                const Tab(
+                                  child: Text(
+                                    'All',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                    ),
                                   ),
                                 ),
-                              );
-                            }).toList(),
-                          ],
-                        ),
-                      ),
-                      Expanded(
-                        child: TabBarView(
-                          children: [
-                            // 1. ALL PRODUCTS TAB
-                            StreamBuilder<QuerySnapshot>(
-                              stream: _allProductsStream,
-                              builder: (context, prodSnapshot) {
-                                if (prodSnapshot.hasError)
-                                  return const Center(
-                                    child: Text('Error loading products'),
-                                  );
-                                if (!prodSnapshot.hasData)
-                                  return const Center(
-                                    child: CircularProgressIndicator(),
-                                  );
-
-                                final products = prodSnapshot.data!.docs;
-                                return _buildProductGrid(products);
-                              },
-                            ),
-                            // 2. CATEGORY SPECIFIC TABS
-                            ...categories.map((c) {
-                              // Products Grid for this category
-                              return StreamBuilder<QuerySnapshot>(
-                                stream: _firestore
-                                    .collection('product')
-                                    .where('categoryId', isEqualTo: c.id)
-                                    .where('isDeleted', isEqualTo: false)
-                                    .snapshots(),
-                                builder: (context, prodSnapshot) {
-                                  if (prodSnapshot.hasError) {
-                                    print(
-                                      "Product Stream Error: ${prodSnapshot.error}",
-                                    );
-                                    return Center(
-                                      child: Text(
-                                        'Error: ${prodSnapshot.error}',
+                                ...categories.map((c) {
+                                  final data = c.data() as Map<String, dynamic>;
+                                  return Tab(
+                                    child: Text(
+                                      data['nameEn'],
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
                                       ),
-                                    );
-                                  }
-                                  if (!prodSnapshot.hasData)
-                                    return const Center(
-                                      child: CircularProgressIndicator(),
-                                    );
-                                  final products = prodSnapshot.data!.docs;
-                                  return _buildProductGrid(products);
-                                },
-                              );
-                            }).toList(),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ),
-
-          // 3. Cart Section (Right)
-          Container(
-            width: 360,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              border: Border(left: BorderSide(color: Colors.grey[200]!)),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.02),
-                  blurRadius: 15,
-                  offset: const Offset(-5, 0),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Top Area: Order Type & Token info
-                Padding(
-                  padding: const EdgeInsets.all(20.0),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Order Type',
-                              style: TextStyle(
-                                color: Colors.grey[600],
-                                fontSize: 12,
-                              ),
+                                    ),
+                                  );
+                                }).toList(),
+                              ],
                             ),
-                            const SizedBox(height: 4),
-                            Container(
-                              height: 40,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                              ),
-                              decoration: BoxDecoration(
-                                border: Border.all(color: Colors.grey[200]!),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: DropdownButtonHideUnderline(
-                                child: DropdownButton<String>(
-                                  isExpanded: true,
-                                  value: _selectedOrderType,
-                                  icon: Icon(
-                                    Icons.keyboard_arrow_down,
-                                    color: Colors.grey[600],
-                                  ),
-                                  items: _orderTypes
-                                      .map(
-                                        (type) => DropdownMenuItem(
-                                          value: type,
+                          ),
+                          Expanded(
+                            child: TabBarView(
+                              children: [
+                                // 1. ALL PRODUCTS TAB
+                                StreamBuilder<QuerySnapshot>(
+                                  stream: _allProductsStream,
+                                  builder: (context, prodSnapshot) {
+                                    if (prodSnapshot.hasError)
+                                      return const Center(
+                                        child: Text('Error loading products'),
+                                      );
+                                    if (!prodSnapshot.hasData)
+                                      return const Center(
+                                        child: CircularProgressIndicator(),
+                                      );
+
+                                    final products = prodSnapshot.data!.docs;
+                                    return _buildProductGrid(products);
+                                  },
+                                ),
+                                // 2. CATEGORY SPECIFIC TABS
+                                ...categories.map((c) {
+                                  // Products Grid for this category
+                                  return StreamBuilder<QuerySnapshot>(
+                                    stream: _firestore
+                                        .collection('product')
+                                        .where('categoryId', isEqualTo: c.id)
+                                        .where('isDeleted', isEqualTo: false)
+                                        .snapshots(),
+                                    builder: (context, prodSnapshot) {
+                                      if (prodSnapshot.hasError) {
+                                        print(
+                                          "Product Stream Error: ${prodSnapshot.error}",
+                                        );
+                                        return Center(
                                           child: Text(
-                                            type,
-                                            style: const TextStyle(
-                                              fontSize: 14,
-                                            ),
+                                            'Error: ${prodSnapshot.error}',
                                           ),
-                                        ),
-                                      )
-                                      .toList(),
-                                  onChanged: (val) =>
-                                      setState(() => _selectedOrderType = val!),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: InkWell(
-                          onTap: _resetToken,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Token ID',
-                                style: TextStyle(
-                                  color: Colors.grey[600],
-                                  fontSize: 12,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Container(
-                                height: 40,
-                                alignment: Alignment.centerLeft,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                ),
-                                decoration: BoxDecoration(
-                                  border: Border.all(color: Colors.grey[200]!),
-                                  borderRadius: BorderRadius.circular(8),
-                                  color: Colors.grey[50],
-                                ),
-                                child: Text(
-                                  '#${_currentToken.toString().padLeft(3, '0')}',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Order Items Header
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Order Items',
-                            style: TextStyle(color: Colors.grey, fontSize: 13),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            _selectedTable == null
-                                ? '0'
-                                : '${_selectedTable!.items.length}',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 18,
-                              color: Color(0xFF1E293B),
+                                        );
+                                      }
+                                      if (!prodSnapshot.hasData)
+                                        return const Center(
+                                          child: CircularProgressIndicator(),
+                                        );
+                                      final products = prodSnapshot.data!.docs;
+                                      return _buildProductGrid(products);
+                                    },
+                                  );
+                                }).toList(),
+                              ],
                             ),
                           ),
                         ],
                       ),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
+                    );
+                  },
+                ),
+              ),
+
+              // 3. Cart Section (Right)
+              Container(
+                width: 360,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  border: Border(left: BorderSide(color: Colors.grey[200]!)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.02),
+                      blurRadius: 15,
+                      offset: const Offset(-5, 0),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Top Area: Order Type & Token info
+                    Padding(
+                      padding: const EdgeInsets.all(20.0),
+                      child: Row(
                         children: [
-                          const Text(
-                            'Table',
-                            style: TextStyle(color: Colors.grey, fontSize: 13),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            _selectedTable == null
-                                ? '--'
-                                : _selectedTable!.tableNumber,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 18,
-                              color: Color(0xFF1E293B),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Order Type',
+                                  style: TextStyle(
+                                    color: Colors.grey[600],
+                                    fontSize: 12,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Container(
+                                  height: 40,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    border: Border.all(
+                                      color: Colors.grey[200]!,
+                                    ),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: DropdownButtonHideUnderline(
+                                    child: DropdownButton<String>(
+                                      isExpanded: true,
+                                      value: _selectedOrderType,
+                                      icon: Icon(
+                                        Icons.keyboard_arrow_down,
+                                        color: Colors.grey[600],
+                                      ),
+                                      items: _orderTypes
+                                          .map(
+                                            (type) => DropdownMenuItem(
+                                              value: type,
+                                              child: Text(
+                                                type,
+                                                style: const TextStyle(
+                                                  fontSize: 14,
+                                                ),
+                                              ),
+                                            ),
+                                          )
+                                          .toList(),
+                                      onChanged: (val) => setState(
+                                        () => _selectedOrderType = val!,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 12.0,
-                    horizontal: 20,
-                  ),
-                  child: Divider(color: Colors.grey[200]),
-                ),
-
-                // Cart Items List
-                Expanded(
-                  child: _selectedTable == null || _selectedTable!.items.isEmpty
-                      ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.shopping_bag_outlined,
-                                size: 64,
-                                color: Colors.grey[300],
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                'Cart is empty',
-                                style: TextStyle(
-                                  color: Colors.grey[500],
-                                  fontSize: 16,
-                                ),
-                              ),
-                            ],
-                          ),
-                        )
-                      : ListView.builder(
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          itemCount: _selectedTable!.items.length,
-                          itemBuilder: (context, index) {
-                            final item = _selectedTable!.items[index];
-                            final addons = item['addons'] as List? ?? [];
-                            double addonsTotal = addons.fold(
-                              0.0,
-                              (s, a) =>
-                                  s +
-                                  (double.tryParse(a['price'].toString()) ??
-                                      0.0),
-                            );
-                            double itemPrice =
-                                double.tryParse(item['price'].toString()) ??
-                                0.0;
-                            double finalPrice = itemPrice + addonsTotal;
-
-                            return Container(
-                              margin: const EdgeInsets.only(bottom: 16),
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: Colors.grey[100]!),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.01),
-                                    blurRadius: 4,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ],
-                              ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: InkWell(
+                              onTap: _resetToken,
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Row(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      // Image placeholder
-                                      Container(
-                                        width: 50,
-                                        height: 50,
-                                        decoration: BoxDecoration(
-                                          color: Colors.orange.shade50,
-                                          borderRadius: BorderRadius.circular(
-                                            8,
-                                          ),
-                                        ),
-                                        child: const Center(
-                                          child: Icon(
-                                            Icons.fastfood,
-                                            color: Colors.orange,
-                                            size: 24,
-                                          ),
-                                        ),
+                                  Text(
+                                    'Token ID',
+                                    style: TextStyle(
+                                      color: Colors.grey[600],
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Container(
+                                    height: 40,
+                                    alignment: Alignment.centerLeft,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      border: Border.all(
+                                        color: Colors.grey[200]!,
                                       ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              item['nameEn'] ?? '',
-                                              style: const TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 14,
-                                                color: Color(0xFF1E293B),
-                                              ),
-                                            ),
-                                            const SizedBox(height: 2),
-                                            Text(
-                                              item['nameAr'] ?? '',
-                                              style: TextStyle(
-                                                color: Colors.grey[500],
-                                                fontSize: 12,
-                                              ),
-                                            ),
-                                            if (addons.isNotEmpty) ...[
-                                              const SizedBox(height: 6),
-                                              ...addons.map(
-                                                (a) => Text(
-                                                  '+ ${a['nameEn']} / ${a['nameAr']} (\$${a['price']})',
-                                                  style: TextStyle(
-                                                    fontSize: 11,
-                                                    color: Colors.grey[600],
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
-                                          ],
-                                        ),
+                                      borderRadius: BorderRadius.circular(8),
+                                      color: Colors.grey[50],
+                                    ),
+                                    child: Text(
+                                      '#${_currentToken.toString().padLeft(3, '0')}',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Order Items Header
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Order Items',
+                                style: TextStyle(
+                                  color: Colors.grey,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                _selectedTable == null
+                                    ? '0'
+                                    : '${_selectedTable!.items.length}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 18,
+                                  color: Color(0xFF1E293B),
+                                ),
+                              ),
+                            ],
+                          ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              const Text(
+                                'Table',
+                                style: TextStyle(
+                                  color: Colors.grey,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                _selectedTable == null
+                                    ? '--'
+                                    : _selectedTable!.tableNumber,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 18,
+                                  color: Color(0xFF1E293B),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 12.0,
+                        horizontal: 20,
+                      ),
+                      child: Divider(color: Colors.grey[200]),
+                    ),
+
+                    // Cart Items List
+                    Expanded(
+                      child:
+                          _selectedTable == null ||
+                              _selectedTable!.items.isEmpty
+                          ? Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.shopping_bag_outlined,
+                                    size: 64,
+                                    color: Colors.grey[300],
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    'Cart is empty',
+                                    style: TextStyle(
+                                      color: Colors.grey[500],
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : ListView.builder(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                              ),
+                              itemCount: _selectedTable!.items.length,
+                              itemBuilder: (context, index) {
+                                final item = _selectedTable!.items[index];
+                                final addons = item['addons'] as List? ?? [];
+                                double addonsTotal = addons.fold(
+                                  0.0,
+                                  (s, a) =>
+                                      s +
+                                      (double.tryParse(a['price'].toString()) ??
+                                          0.0),
+                                );
+                                double itemPrice =
+                                    double.tryParse(item['price'].toString()) ??
+                                    0.0;
+                                double finalPrice = itemPrice + addonsTotal;
+
+                                return Container(
+                                  margin: const EdgeInsets.only(bottom: 16),
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: Colors.grey[100]!,
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.01),
+                                        blurRadius: 4,
+                                        offset: const Offset(0, 2),
                                       ),
                                     ],
                                   ),
-                                  const SizedBox(height: 12),
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
-                                      // Quantity controls
                                       Row(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
-                                          InkWell(
-                                            onTap: () =>
-                                                _updateQuantity(index, -1),
-                                            child: Container(
-                                              width: 28,
-                                              height: 28,
-                                              decoration: BoxDecoration(
-                                                color: Colors.orange
-                                                    .withOpacity(0.1),
-                                                borderRadius:
-                                                    BorderRadius.circular(6),
-                                              ),
-                                              child: const Icon(
-                                                Icons.remove,
-                                                size: 16,
-                                                color: Colors.orange,
-                                              ),
-                                            ),
-                                          ),
+                                          // Image placeholder
                                           Container(
-                                            width: 36,
-                                            alignment: Alignment.center,
-                                            child: Text(
-                                              '${item['quantity']}',
-                                              style: const TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 14,
-                                                color: Color(0xFF1E293B),
-                                              ),
+                                            width: 50,
+                                            height: 50,
+                                            decoration: BoxDecoration(
+                                              color: Colors.orange.shade50,
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
                                             ),
-                                          ),
-                                          InkWell(
-                                            onTap: () =>
-                                                _updateQuantity(index, 1),
-                                            child: Container(
-                                              width: 28,
-                                              height: 28,
-                                              decoration: BoxDecoration(
-                                                color: Colors.orange
-                                                    .withOpacity(0.1),
-                                                borderRadius:
-                                                    BorderRadius.circular(6),
-                                              ),
-                                              child: const Icon(
-                                                Icons.add,
-                                                size: 16,
+                                            child: const Center(
+                                              child: Icon(
+                                                Icons.fastfood,
                                                 color: Colors.orange,
+                                                size: 24,
                                               ),
                                             ),
                                           ),
                                           const SizedBox(width: 12),
-                                          InkWell(
-                                            onTap: () => _openAddons(index),
-                                            child: Container(
-                                              width: 28,
-                                              height: 28,
-                                              decoration: BoxDecoration(
-                                                color: Colors.grey.withOpacity(
-                                                  0.1,
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  item['nameEn'] ?? '',
+                                                  style: const TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 14,
+                                                    color: Color(0xFF1E293B),
+                                                  ),
                                                 ),
-                                                borderRadius:
-                                                    BorderRadius.circular(6),
-                                              ),
-                                              child: const Icon(
-                                                Icons.edit,
-                                                size: 14,
-                                                color: Colors.grey,
-                                              ),
+                                                const SizedBox(height: 2),
+                                                Text(
+                                                  item['nameAr'] ?? '',
+                                                  style: TextStyle(
+                                                    color: Colors.grey[500],
+                                                    fontSize: 12,
+                                                  ),
+                                                ),
+                                                if (addons.isNotEmpty) ...[
+                                                  const SizedBox(height: 6),
+                                                  ...addons.map(
+                                                    (a) => Text(
+                                                      '+ ${a['nameEn']} / ${a['nameAr']} (\$${a['price']})',
+                                                      style: TextStyle(
+                                                        fontSize: 11,
+                                                        color: Colors.grey[600],
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ],
                                             ),
                                           ),
                                         ],
                                       ),
-                                      // Total price for this item row
+                                      const SizedBox(height: 12),
+                                      Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          // Quantity controls
+                                          Row(
+                                            children: [
+                                              InkWell(
+                                                onTap: () =>
+                                                    _updateQuantity(index, -1),
+                                                child: Container(
+                                                  width: 28,
+                                                  height: 28,
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.orange
+                                                        .withOpacity(0.1),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          6,
+                                                        ),
+                                                  ),
+                                                  child: const Icon(
+                                                    Icons.remove,
+                                                    size: 16,
+                                                    color: Colors.orange,
+                                                  ),
+                                                ),
+                                              ),
+                                              Container(
+                                                width: 36,
+                                                alignment: Alignment.center,
+                                                child: Text(
+                                                  '${item['quantity']}',
+                                                  style: const TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 14,
+                                                    color: Color(0xFF1E293B),
+                                                  ),
+                                                ),
+                                              ),
+                                              InkWell(
+                                                onTap: () =>
+                                                    _updateQuantity(index, 1),
+                                                child: Container(
+                                                  width: 28,
+                                                  height: 28,
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.orange
+                                                        .withOpacity(0.1),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          6,
+                                                        ),
+                                                  ),
+                                                  child: const Icon(
+                                                    Icons.add,
+                                                    size: 16,
+                                                    color: Colors.orange,
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 12),
+                                              InkWell(
+                                                onTap: () => _openAddons(index),
+                                                child: Container(
+                                                  width: 28,
+                                                  height: 28,
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.grey
+                                                        .withOpacity(0.1),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          6,
+                                                        ),
+                                                  ),
+                                                  child: const Icon(
+                                                    Icons.edit,
+                                                    size: 14,
+                                                    color: Colors.grey,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          // Total price for this item row
+                                          Text(
+                                            '\$${(finalPrice * item['quantity']).toStringAsFixed(2)}',
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 16,
+                                              color: Colors.orange,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                    ),
+
+                    // Order Summary Section
+                    Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.03),
+                            blurRadius: 10,
+                            offset: const Offset(0, -5),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        children: [
+                          const Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              'Order Summary',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                                color: Color(0xFF1E293B),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          // Calculate totals
+                          Builder(
+                            builder: (context) {
+                              double subTotal = 0.0;
+                              if (_selectedTable != null) {
+                                for (var item in _selectedTable!.items) {
+                                  double itemPrice =
+                                      double.tryParse(
+                                        item['price'].toString(),
+                                      ) ??
+                                      0.0;
+                                  double addonsTotal =
+                                      (item['addons'] as List? ?? []).fold(
+                                        0.0,
+                                        (s, a) =>
+                                            s +
+                                            (double.tryParse(
+                                                  a['price'].toString(),
+                                                ) ??
+                                                0.0),
+                                      );
+                                  subTotal +=
+                                      (itemPrice + addonsTotal) *
+                                      (item['quantity'] as int);
+                                }
+                              }
+                              return Column(
+                                children: [
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
                                       Text(
-                                        '\$${(finalPrice * item['quantity']).toStringAsFixed(2)}',
+                                        'Sub Total',
+                                        style: TextStyle(
+                                          color: Colors.grey[600],
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                      Text(
+                                        '\$${subTotal.toStringAsFixed(2)}',
                                         style: const TextStyle(
                                           fontWeight: FontWeight.bold,
+                                          fontSize: 14,
+                                          color: Color(0xFF1E293B),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 16.0,
+                                    ),
+                                    child: Divider(color: Colors.grey[200]),
+                                  ),
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      const Text(
+                                        'Total Amount',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
                                           fontSize: 16,
+                                          color: Color(0xFF1E293B),
+                                        ),
+                                      ),
+                                      Text(
+                                        '\$${subTotal.toStringAsFixed(2)}',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 24,
                                           color: Colors.orange,
                                         ),
                                       ),
                                     ],
                                   ),
                                 ],
+                              );
+                            },
+                          ),
+                          const SizedBox(height: 24),
+                          ElevatedButton(
+                            onPressed:
+                                (_selectedTable == null ||
+                                    _selectedTable!.items.isEmpty)
+                                ? null
+                                : _checkout,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors
+                                  .orange, // matches template's bright orange
+                              disabledBackgroundColor: Colors.orange
+                                  .withOpacity(0.5),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
                               ),
-                            );
-                          },
-                        ),
+                              minimumSize: const Size(double.infinity, 54),
+                              elevation: 0,
+                            ),
+                            child: const Text(
+                              'Checkout',
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
+              ),
+            ],
+          ),
 
-                // Order Summary Section
-                Container(
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.03),
-                        blurRadius: 10,
-                        offset: const Offset(0, -5),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    children: [
-                      const Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          'Order Summary',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                            color: Color(0xFF1E293B),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      // Calculate totals
-                      Builder(
-                        builder: (context) {
-                          double subTotal = 0.0;
-                          if (_selectedTable != null) {
-                            for (var item in _selectedTable!.items) {
-                              double itemPrice =
-                                  double.tryParse(item['price'].toString()) ??
-                                  0.0;
-                              double addonsTotal =
-                                  (item['addons'] as List? ?? []).fold(
-                                    0.0,
-                                    (s, a) =>
-                                        s +
-                                        (double.tryParse(
-                                              a['price'].toString(),
-                                            ) ??
-                                            0.0),
-                                  );
-                              subTotal +=
-                                  (itemPrice + addonsTotal) *
-                                  (item['quantity'] as int);
-                            }
-                          }
-                          return Column(
-                            children: [
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    'Sub Total',
-                                    style: TextStyle(
-                                      color: Colors.grey[600],
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                  Text(
-                                    '\$${subTotal.toStringAsFixed(2)}',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14,
-                                      color: Color(0xFF1E293B),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 16.0,
-                                ),
-                                child: Divider(color: Colors.grey[200]),
-                              ),
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  const Text(
-                                    'Total Amount',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
-                                      color: Color(0xFF1E293B),
-                                    ),
-                                  ),
-                                  Text(
-                                    '\$${subTotal.toStringAsFixed(2)}',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 24,
-                                      color: Colors.orange,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          );
-                        },
-                      ),
-                      const SizedBox(height: 24),
-                      ElevatedButton(
-                        onPressed:
-                            (_selectedTable == null ||
-                                _selectedTable!.items.isEmpty)
-                            ? null
-                            : _checkout,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor:
-                              Colors.orange, // matches template's bright orange
-                          disabledBackgroundColor: Colors.orange.withOpacity(
-                            0.5,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          minimumSize: const Size(double.infinity, 54),
-                          elevation: 0,
-                        ),
-                        child: const Text(
-                          'Checkout',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-          ),
-          
           // --- HIDDEN RECEIPT FOR PRINTING ---
           // Positioned far off-screen so it never intercepts touches or displays,
           // but is technically mounted in the tree with unconstrained height bounds.
@@ -1592,22 +1645,23 @@ class _PosPageState extends State<PosPage> with SingleTickerProviderStateMixin {
             top: -5000,
             child: Screenshot(
               controller: _screenshotController,
-              child: _printData != null ? Container(
-                width: 400,
-                color: Colors.white,
-                child: PosBillWidget(
-                  data: _printData!,
-                  orderId: _printOrderId ?? '',
-                  tokenNumber: _printToken,
-                ),
-              ) : const SizedBox.shrink(),
+              child: _printData != null
+                  ? Container(
+                      width: 400,
+                      color: Colors.white,
+                      child: PosBillWidget(
+                        data: _printData!,
+                        orderId: _printOrderId ?? '',
+                        tokenNumber: _printToken,
+                      ),
+                    )
+                  : const SizedBox.shrink(),
             ),
           ),
         ],
       ),
     );
   }
-
 
   // Helper method for rendering the gorgeous product grid
   Widget _buildProductGrid(List<QueryDocumentSnapshot> products) {

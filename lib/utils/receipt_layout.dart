@@ -29,7 +29,7 @@ class OrderReceiptLayout {
     // --- Data Extraction ---
     final double totalAmount = (data['totalAmount'] as num?)?.toDouble() ?? 0.0;
     final List<dynamic> items = data['items'] ?? [];
-    final String orderType = data['orderType'] ?? 'Takeaway';
+    final String orderType = data['orderType'] ?? 'Customer App';
 
     DateTime orderDate = DateTime.now();
     if (data['createdAt'] != null) {
@@ -60,6 +60,7 @@ class OrderReceiptLayout {
       styles: const PosStyles(bold: true),
     );
     bytes += generator.text('Type: $orderType');
+    // bytes+=generator.text('');
     bytes += generator.text(
       'Date: ${DateFormat('MMM d, yyyy h:mm a').format(orderDate)}',
     );
@@ -236,7 +237,7 @@ class OrderReceiptLayout {
     final profile = await CapabilityProfile.load();
     final generator = Generator(PaperSize.mm80, profile);
     List<int> bytes = [];
-    
+
     // Reset printer to clear any lingering styles
     bytes += generator.reset();
 

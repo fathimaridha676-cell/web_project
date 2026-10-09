@@ -13,8 +13,36 @@ import 'package:flutter_thermal_printer/flutter_thermal_printer.dart';
 import 'package:flutter_thermal_printer/utils/printer.dart';
 import 'package:permission_handler/permission_handler.dart';
 
-class HomePage extends StatelessWidget {
+class HomePage extends StatefulWidget {
   const HomePage({super.key});
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  String? _currentPrinterName;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPrinter(); // Load the saved printer when the page initializes
+  }
+
+  // Helper method to fetch the currently saved printer based on the platform
+  Future<void> _loadPrinter() async {
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      final printer = await PrinterService.getAndroidPrinter();
+      setState(() {
+        _currentPrinterName = printer?.name;
+      });
+    } else {
+      final printerName = await PrinterService.getPrinterName();
+      setState(() {
+        _currentPrinterName = printerName.isNotEmpty ? printerName : null;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -59,7 +87,39 @@ class HomePage extends StatelessWidget {
             child: Row(
               children: [
                 // Conditionally display the print icon only if the app is running on Windows or Android
-                if (defaultTargetPlatform == TargetPlatform.windows || defaultTargetPlatform == TargetPlatform.android)
+                if (defaultTargetPlatform == TargetPlatform.windows || defaultTargetPlatform == TargetPlatform.android) ...[
+                  // --- NEW UI: Display currently selected printer ---
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: _currentPrinterName != null ? Colors.teal.shade50 : Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: _currentPrinterName != null ? Colors.teal.shade200 : Colors.grey.shade300,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.print,
+                          size: 14,
+                          color: _currentPrinterName != null ? Colors.teal.shade700 : Colors.grey.shade600,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          _currentPrinterName ?? 'No Printer',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: _currentPrinterName != null ? Colors.teal.shade700 : Colors.grey.shade600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  
                   IconButton(
                     icon: const Icon(
                       Icons.print_rounded,
@@ -70,20 +130,43 @@ class HomePage extends StatelessWidget {
                         // --- ANDROID: Bluetooth & USB Setup ---
                         
                         // 1. Request Runtime Permissions
-                        // Android strictly requires these to be granted by the user at runtime
-                        // 1. Request Runtime Permissions
-                        await [
-                          Permission.location,
-                          Permission.bluetoothScan,
-                          Permission.bluetoothConnect,
+                        // Android strictly requires Location to be granted for BLE scans to work.
+                        Map<Permission, PermissionStatus> statuses = await [
+                          Permission.locationWhenInUse, // Specifically ask for location when in use (required for BLE)
+                          Permission.bluetoothScan,     // Required for Android 12+
+                          Permission.bluetoothConnect,  // Required for Android 12+
                         ].request();
-                        // 2. Start Scanning (Intelligent Fallback)
+
+                        // 2. Check if Location permission is permanently denied
+                        if (statuses[Permission.locationWhenInUse]?.isPermanentlyDenied == true) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: const Text('Location permission required for Bluetooth. Please enable in Settings.'),
+                                action: SnackBarAction(
+                                  label: 'Settings',
+                                  onPressed: () => openAppSettings(), // Takes user to OS app settings
+                                ),
+                                duration: const Duration(seconds: 5),
+                              ),
+                            );
+                          }
+                          // Proceeding anyway because the USB scan might still work perfectly without location!
+                        } else if (statuses[Permission.locationWhenInUse]?.isDenied == true) {
+                           if (context.mounted) {
+                             ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Bluetooth scan may fail without Location permission.')),
+                            );
+                           }
+                        }
+
+                        // 3. Start Scanning (Intelligent Fallback)
                         final plugin = FlutterThermalPrinter.instance;
                         
                         // We run the scans in the background so the dialog can pop open immediately
                         Future(() async {
                           try {
-                            // 1. Scan for USB printers first. This is highly reliable.
+                            // 1. Scan for USB printers first. This is highly reliable and doesn't need location.
                             await plugin.getPrinters(connectionTypes: [ConnectionType.USB]);
                           } catch (e) {
                             print("DEBUG: USB Scan failed - $e");
@@ -93,8 +176,7 @@ class HomePage extends StatelessWidget {
                           await Future.delayed(const Duration(milliseconds: 1500));
                           
                           try {
-                            // 2. Now attempt BLE. If this crashes (like on your iMin device), 
-                            // it won't affect the USB printer we already found!
+                            // 2. Now attempt BLE. If Location was denied, this will throw a UniversalBleException.
                             await plugin.getPrinters(connectionTypes: [ConnectionType.BLE]);
                           } catch (e) {
                             print("DEBUG: BLE Scan failed (Likely permission denied by OS) - $e");
@@ -173,7 +255,8 @@ class HomePage extends StatelessWidget {
                                             onTap: () async {
                                               await PrinterService.setAndroidPrinter(printer);
                                               if (context.mounted) {
-                                                Navigator.pop(context);
+                                                Navigator.pop(context); // Close the dialog
+                                                _loadPrinter(); // Refresh the UI with the new printer!
                                                 ScaffoldMessenger.of(context).showSnackBar(
                                                   SnackBar(content: Text('Android Printer saved: ${printer.name}')),
                                                 );
@@ -253,6 +336,7 @@ class HomePage extends StatelessWidget {
                                       Navigator.pop(
                                         context,
                                       ); // Close the dialog
+                                      _loadPrinter(); // Refresh the UI with the new printer!
                                       // Show a success message
                                       ScaffoldMessenger.of(
                                         context,
@@ -278,6 +362,7 @@ class HomePage extends StatelessWidget {
                       }
                     },
                   ),
+                ], // CLOSE SPREAD HERE
                 // Add spacing if the print icon is displayed
                 if (defaultTargetPlatform == TargetPlatform.windows || defaultTargetPlatform == TargetPlatform.android)
                   const SizedBox(width: 16),
