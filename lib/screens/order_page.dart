@@ -3,7 +3,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/foundation.dart'; // Used to check if platform is Windows/Android
 import '../services/printer_service.dart'; // Used to fetch the saved printer config
-import '../utils/receipt_layout.dart'; // Used to generate the PDF receipt layout
 import '../widgets/main_receipt.dart';
 import '../widgets/kot_receipt.dart';
 import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';

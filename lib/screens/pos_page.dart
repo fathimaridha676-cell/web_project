@@ -6,8 +6,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/table_model.dart';
 import '../models/category_model.dart';
 import '../services/printer_service.dart';
-import '../utils/receipt_layout.dart';
-import '../widgets/pos_bill_widget.dart';
 import '../widgets/main_receipt.dart';
 import '../widgets/kot_receipt.dart';
 import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
@@ -37,12 +35,6 @@ class _PosPageState extends State<PosPage> with SingleTickerProviderStateMixin {
   late final Stream<QuerySnapshot> _tablesStream;
   late final Stream<QuerySnapshot> _categoriesStream;
   late final Stream<QuerySnapshot> _allProductsStream;
-
-  // For off-screen printing capture
-  final ScreenshotController _screenshotController = ScreenshotController();
-  Map<String, dynamic>? _printData;
-  String? _printOrderId;
-  int? _printToken;
 
   @override
   void initState() {
@@ -770,14 +762,7 @@ class _PosPageState extends State<PosPage> with SingleTickerProviderStateMixin {
           printData['createdAt'] = DateTime.now().toIso8601String();
           printData['items'] = currentCartItems;
 
-          // 2. Set the state so the hidden widget builds
-          setState(() {
-            _printData = printData;
-            _printOrderId = orderId;
-            _printToken = nextToken;
-          });
-
-          // 3. Wait a frame to trigger the prints
+          // 2. Trigger receipt printing directly
           WidgetsBinding.instance.addPostFrameCallback((_) async {
             try {
               // 1. Generate the Main Customer Bill bytes
@@ -1656,28 +1641,6 @@ class _PosPageState extends State<PosPage> with SingleTickerProviderStateMixin {
                 ),
               ),
             ],
-          ),
-
-          // --- HIDDEN RECEIPT FOR PRINTING ---
-          // Positioned far off-screen so it never intercepts touches or displays,
-          // but is technically mounted in the tree with unconstrained height bounds.
-          Positioned(
-            left: -5000,
-            top: -5000,
-            child: Screenshot(
-              controller: _screenshotController,
-              child: _printData != null
-                  ? Container(
-                      width: 400,
-                      color: Colors.white,
-                      child: PosBillWidget(
-                        data: _printData!,
-                        orderId: _printOrderId ?? '',
-                        tokenNumber: _printToken,
-                      ),
-                    )
-                  : const SizedBox.shrink(),
-            ),
           ),
         ],
       ),
