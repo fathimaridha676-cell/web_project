@@ -187,93 +187,130 @@ class _HomePageState extends State<HomePage> {
                           showDialog(
                             context: context,
                             builder: (context) {
-                              // Local list to permanently store any printer we find, so they don't disappear!
+                              // Local list to permanently store any printer we find
                               List<Printer> accumulatedPrinters = [];
                               
-                              return AlertDialog(
-                                title: const Text('Select Printer (USB & Bluetooth)'),
-                                content: SizedBox(
-                                  width: double.maxFinite,
-                                  child: StreamBuilder<List<Printer>>(
-                                    stream: plugin.devicesStream,
-                                    builder: (context, snapshot) {
-                                      // If the stream found printers, add them to our permanent list
-                                      if (snapshot.hasData && snapshot.data!.isNotEmpty) {
-                                        for (var p in snapshot.data!) {
-                                          // Ensure we don't add duplicates
-                                          if (!accumulatedPrinters.any((existing) => (existing.address == p.address && existing.vendorId == p.vendorId))) {
-                                            accumulatedPrinters.add(p);
-                                          }
-                                        }
-                                      }
-                                      
-                                      // If we haven't found ANY printers yet, show the loader
-                                      if (accumulatedPrinters.isEmpty) {
-                                        return const Padding(
-                                          padding: EdgeInsets.all(16.0),
-                                          child: Center(child: CircularProgressIndicator()),
-                                        );
-                                      }
-                                      
-                                      final printers = accumulatedPrinters;
-                                      return ListView.builder(
-                                        shrinkWrap: true,
-                                        itemCount: printers.length,
-                                        itemBuilder: (context, index) {
-                                          final printer = printers[index];
-                                          return ListTile(
-                                            leading: Icon(printer.connectionType == ConnectionType.USB ? Icons.usb : Icons.bluetooth),
-                                            title: Text(printer.name ?? 'Unknown Device'),
-                                            subtitle: Text(printer.connectionType == ConnectionType.USB ? 'USB Printer' : (printer.address ?? '')),
-                                            // --- NEW TEST BUTTON ---
-                                            trailing: TextButton.icon(
-                                              onPressed: () async {
-                                                // 1. Show loading state so the user knows it's doing something
-                                                ScaffoldMessenger.of(context).showSnackBar(
-                                                  SnackBar(content: Text('Testing ${printer.name}...')),
-                                                );
-                                                
-                                                // 2. Call the new test print function with the full printer object
-                                                final error = await PrinterService.testAndroidPrint(printer);
-                                                
-                                                if (context.mounted) {
-                                                  // 3. Display success or error
-                                                  if (error == null) {
-                                                    ScaffoldMessenger.of(context).showSnackBar(
-                                                      const SnackBar(content: Text('Test Print Successful!'), backgroundColor: Colors.green),
-                                                    );
-                                                  } else {
-                                                    ScaffoldMessenger.of(context).showSnackBar(
-                                                      SnackBar(content: Text(error), backgroundColor: Colors.red),
-                                                    );
-                                                  }
-                                                }
-                                              },
-                                              icon: const Icon(Icons.print, size: 18),
-                                              label: const Text('TEST'),
-                                            ),
-                                            onTap: () async {
-                                              await PrinterService.setAndroidPrinter(printer);
-                                              if (context.mounted) {
-                                                Navigator.pop(context); // Close the dialog
-                                                _loadPrinter(); // Refresh the UI with the new printer!
-                                                ScaffoldMessenger.of(context).showSnackBar(
-                                                  SnackBar(content: Text('Android Printer saved: ${printer.name}')),
-                                                );
+                              // 1. Remember the currently selected printer internally
+                              String? localSelectedPrinter = _currentPrinterName;
+                              
+                              // 2. StatefulBuilder allows us to redraw the box without closing the dialog!
+                              return StatefulBuilder(
+                                builder: (context, setDialogState) {
+                                  return AlertDialog(
+                                    title: const Text('Select Printer (USB & Bluetooth)'),
+                                    content: SizedBox(
+                                      width: double.maxFinite,
+                                      child: StreamBuilder<List<Printer>>(
+                                        stream: plugin.devicesStream,
+                                        builder: (context, snapshot) {
+                                          if (snapshot.hasData && snapshot.data!.isNotEmpty) {
+                                            for (var p in snapshot.data!) {
+                                              if (!accumulatedPrinters.any((existing) => (existing.address == p.address && existing.vendorId == p.vendorId))) {
+                                                accumulatedPrinters.add(p);
                                               }
+                                            }
+                                          }
+                                          
+                                          if (accumulatedPrinters.isEmpty) {
+                                            return const Padding(
+                                              padding: EdgeInsets.all(16.0),
+                                              child: Center(child: CircularProgressIndicator()),
+                                            );
+                                          }
+                                          
+                                          final printers = accumulatedPrinters;
+                                          return ListView.builder(
+                                            shrinkWrap: true,
+                                            itemCount: printers.length,
+                                            itemBuilder: (context, index) {
+                                              final printer = printers[index];
+                                              
+                                              // 3. Check if this is the active printer
+                                              final bool isSelected = (printer.name == localSelectedPrinter);
+                                              
+                                              // 4. Wrap the ListTile in a styled Container
+                                              return Container(
+                                                margin: const EdgeInsets.symmetric(vertical: 6),
+                                                decoration: BoxDecoration(
+                                                  color: isSelected ? Colors.teal.shade50 : Colors.white,
+                                                  borderRadius: BorderRadius.circular(12),
+                                                  border: Border.all(
+                                                    color: isSelected ? Colors.teal : Colors.grey.shade300,
+                                                    width: isSelected ? 2 : 1,
+                                                  ),
+                                                ),
+                                                child: ListTile(
+                                                  leading: Icon(
+                                                    printer.connectionType == ConnectionType.USB ? Icons.usb : Icons.bluetooth,
+                                                    color: isSelected ? Colors.teal : Colors.grey.shade700,
+                                                  ),
+                                                  title: Text(
+                                                    printer.name ?? 'Unknown Device',
+                                                    style: TextStyle(
+                                                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                                    ),
+                                                  ),
+                                                  subtitle: Text(printer.connectionType == ConnectionType.USB ? 'USB Printer' : (printer.address ?? '')),
+                                                  
+                                                  // 5. Place the checkmark next to the TEST button
+                                                  trailing: Row(
+                                                    mainAxisSize: MainAxisSize.min,
+                                                    children: [
+                                                      if (isSelected)
+                                                        const Icon(Icons.check_circle, color: Colors.teal),
+                                                      const SizedBox(width: 8),
+                                                      TextButton.icon(
+                                                        onPressed: () async {
+                                                          ScaffoldMessenger.of(context).showSnackBar(
+                                                            SnackBar(content: Text('Testing ${printer.name}...')),
+                                                          );
+                                                          final error = await PrinterService.testAndroidPrint(printer);
+                                                          if (context.mounted) {
+                                                            if (error == null) {
+                                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                                const SnackBar(content: Text('Test Print Successful!'), backgroundColor: Colors.green),
+                                                              );
+                                                            } else {
+                                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                                SnackBar(content: Text(error), backgroundColor: Colors.red),
+                                                              );
+                                                            }
+                                                          }
+                                                        },
+                                                        icon: const Icon(Icons.print, size: 18),
+                                                        label: const Text('TEST'),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  
+                                                  // 6. When tapped, smoothly switch the green box instead of popping the dialog
+                                                  onTap: () async {
+                                                    await PrinterService.setAndroidPrinter(printer);
+                                                    
+                                                    // Tell the StatefulBuilder to instantly redraw the green box
+                                                    setDialogState(() {
+                                                      localSelectedPrinter = printer.name;
+                                                    });
+                                                    
+                                                    if (context.mounted) {
+                                                      _loadPrinter(); // Silently updates the background Home Page text!
+                                                    }
+                                                  },
+                                                ),
+                                              );
                                             },
                                           );
                                         },
-                                      );
-                                    },
-                                  ),
-                                ),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () => Navigator.pop(context),
-                                    child: const Text('Cancel'),
-                                  ),
-                                ],
+                                      ),
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(context),
+                                        child: const Text('Close'),
+                                      ),
+                                    ],
+                                  );
+                                },
                               );
                             },
                           );

@@ -30,6 +30,9 @@ class OrderReceiptLayout {
     final double totalAmount = (data['totalAmount'] as num?)?.toDouble() ?? 0.0;
     final List<dynamic> items = data['items'] ?? [];
     final String orderType = data['orderType'] ?? 'Customer App';
+    final String customerName = data['customerName']?.toString() ?? '';
+    final String phone = data['phone']?.toString() ?? '';
+    final String address = data['address']?.toString() ?? '';
 
     DateTime orderDate = DateTime.now();
     if (data['createdAt'] != null) {
@@ -60,7 +63,15 @@ class OrderReceiptLayout {
       styles: const PosStyles(bold: true),
     );
     bytes += generator.text('Type: $orderType');
-    // bytes+=generator.text('');
+    if (customerName.isNotEmpty) {
+      bytes += generator.text('Customer: $customerName');
+    }
+    if (phone.isNotEmpty) {
+      bytes += generator.text('Phone: $phone');
+    }
+    if (address.isNotEmpty) {
+      bytes += generator.text('Address: $address');
+    }
     bytes += generator.text(
       'Date: ${DateFormat('MMM d, yyyy h:mm a').format(orderDate)}',
     );

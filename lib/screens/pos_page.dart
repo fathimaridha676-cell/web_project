@@ -791,8 +791,7 @@ class _PosPageState extends State<PosPage> with SingleTickerProviderStateMixin {
                       capturedImage,
                     );
 
-                final printerName =
-                    await PrinterService.getPrinterName(); // Fallback for USB
+                final printerName = await PrinterService.getPrinterName();
                 final printError = await PrinterService.printBytes(
                   printBytes,
                   printerName: printerName,
