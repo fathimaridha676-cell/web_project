@@ -849,6 +849,7 @@ class _PosPageState extends State<PosPage> with SingleTickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
         title: const Text(
