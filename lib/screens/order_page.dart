@@ -4,6 +4,9 @@ import 'package:intl/intl.dart';
 import 'package:flutter/foundation.dart'; // Used to check if platform is Windows/Android
 import '../services/printer_service.dart'; // Used to fetch the saved printer config
 import '../utils/receipt_layout.dart'; // Used to generate the PDF receipt layout
+import '../widgets/main_receipt.dart';
+import '../widgets/kot_receipt.dart';
+import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
 
 class OrderPage extends StatefulWidget {
   const OrderPage({super.key});
@@ -264,17 +267,28 @@ class _OrderPageState extends State<OrderPage> {
                                         );
 
                                         // Trigger the print job via the centralized service
-                                        final List<int> receiptBytes =
-                                            await OrderReceiptLayout.generate(
-                                              data,
-                                              orderDoc.id,
-                                              context: context,
-                                            );
+                                        final String status = data['status'] ?? 'pending';
+                                        List<int> printBytes = [];
+                                        
+                                        // Logic Router: Decide which layout to use
+                                        if (status == 'delivered') {
+                                          // If delivered, we assume the customer is asking for a final receipt
+                                          printBytes = await MainReceipt.generate(data, orderDoc.id, context: context);
+                                        } else {
+                                          // If pending or in-progress, we assume the chef needs a ticket to start cooking
+                                          printBytes = await KotReceipt.generate(data, orderDoc.id, context: context);
+                                        }
+                                        
+                                        // Always add a cut command at the end of single prints!
+                                        final profile = await CapabilityProfile.load();
+                                        final generator = Generator(PaperSize.mm80, profile);
+                                        printBytes.addAll(generator.cut());
+                                        
                                         String printerName =
                                             await PrinterService.getPrinterName(); // Fallback for Windows
                                         String? errorMsg =
                                             await PrinterService.printBytes(
-                                              receiptBytes,
+                                              printBytes,
                                               printerName: printerName,
                                             );
 

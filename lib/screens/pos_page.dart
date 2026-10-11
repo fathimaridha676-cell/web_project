@@ -8,6 +8,9 @@ import '../models/category_model.dart';
 import '../services/printer_service.dart';
 import '../utils/receipt_layout.dart';
 import '../widgets/pos_bill_widget.dart';
+import '../widgets/main_receipt.dart';
+import '../widgets/kot_receipt.dart';
+import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
 
 class PosPage extends StatefulWidget {
   const PosPage({super.key});
@@ -774,38 +777,55 @@ class _PosPageState extends State<PosPage> with SingleTickerProviderStateMixin {
             _printToken = nextToken;
           });
 
-          // 3. Wait a frame for the hidden widget to render
+          // 3. Wait a frame to trigger the prints
           WidgetsBinding.instance.addPostFrameCallback((_) async {
             try {
-              // 4. Capture the built widget (Wait 800ms to ensure the Image.asset logo is fully decoded and painted)
-              final Uint8List? capturedImage = await _screenshotController
-                  .capture(
-                    delay: const Duration(milliseconds: 800),
-                    pixelRatio: 2.0,
-                  );
+              // 1. Generate the Main Customer Bill bytes
+              // We pass the printData map we built earlier.
+              final List<int> mainBytes = await MainReceipt.generate(
+                printData,
+                orderId,
+                context: context,
+              );
 
-              if (capturedImage != null) {
-                // 5. Convert and print
-                final List<int> printBytes =
-                    await OrderReceiptLayout.generateFromImageBytes(
-                      capturedImage,
-                    );
+              // 2. Generate a physical PAPER CUT command
+              // We load the printer profile just so we can generate the specific byte-code for slicing the paper
+              final profile = await CapabilityProfile.load();
+              final generator = Generator(PaperSize.mm80, profile);
+              final List<int> cutBytes = generator.cut();
 
-                final printerName = await PrinterService.getPrinterName();
-                final printError = await PrinterService.printBytes(
-                  printBytes,
-                  printerName: printerName,
+              // 3. Generate the KOT Ticket bytes
+              // This is the simplified ticket meant for the kitchen staff
+              final List<int> kotBytes = await KotReceipt.generate(
+                printData,
+                orderId,
+                context: context,
+              );
+
+              // 4. Combine them all into one massive string of commands!
+              // The printer will read this as: Print Main Bill -> Slice Paper -> Print KOT
+              final List<int> combinedBytes = [
+                ...mainBytes,
+                ...cutBytes,
+                ...kotBytes,
+              ];
+
+              // 5. Fire it off to the printer!
+              final printerName = await PrinterService.getPrinterName();
+              final printError = await PrinterService.printBytes(
+                combinedBytes,
+                printerName: printerName,
+              );
+
+              // 6. Handle errors if the printer is off or disconnected
+              if (printError != null && mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(printError),
+                    backgroundColor: Colors.red,
+                    duration: const Duration(seconds: 5),
+                  ),
                 );
-
-                if (printError != null && mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(printError),
-                      backgroundColor: Colors.red,
-                      duration: const Duration(seconds: 5),
-                    ),
-                  );
-                }
               }
             } catch (e) {
               print("Capture/Print Error: $e");
