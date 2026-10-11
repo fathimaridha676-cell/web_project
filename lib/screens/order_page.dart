@@ -25,15 +25,21 @@ class _OrderPageState extends State<OrderPage> {
     // it will be used when reciving order from customer app
     Map<String, dynamic>? orderData,
   ]) async {
-    await docRef.update({'status': newStatus});
-
-    //if the customer app status delivered, moving the data to sales collection
+    // If the customer app status delivered, calculate payment breakdown (cash vs credit)
     if (newStatus == 'delivered' && orderData != null) {
       final double totalAmount =
           (orderData['totalAmount'] as num?)?.toDouble() ?? 0.0;
       final String paymentMethod =
           (orderData['paymentMethod']?.toString().toLowerCase() ?? '');
       bool isCash = paymentMethod.contains('cash');
+
+      // Update the order doc with status and payment breakdown so receipts can print cash amount properly
+      await docRef.update({
+        'status': newStatus,
+        'cashAmount': isCash ? totalAmount : 0.0,
+        'creditAmount': isCash ? 0.0 : totalAmount,
+        'balance': 0.0,
+      });
 
       // SAFELY grab up to 6 characters for the ID
       String shortId = docRef.id;
@@ -55,6 +61,9 @@ class _OrderPageState extends State<OrderPage> {
         'timestamp': FieldValue.serverTimestamp(),
       };
       await _firestore.collection('sales').doc(docRef.id).set(salesData);
+    } else {
+      // Normal status update (e.g. pending, in-progress, etc.)
+      await docRef.update({'status': newStatus});
     }
   }
 

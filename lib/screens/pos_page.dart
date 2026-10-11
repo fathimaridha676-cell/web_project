@@ -1331,7 +1331,6 @@ class _PosPageState extends State<PosPage> with SingleTickerProviderStateMixin {
 
                                 return Container(
                                   margin: const EdgeInsets.only(bottom: 16),
-                                  padding: const EdgeInsets.all(12),
                                   decoration: BoxDecoration(
                                     color: Colors.white,
                                     borderRadius: BorderRadius.circular(12),
@@ -1350,161 +1349,163 @@ class _PosPageState extends State<PosPage> with SingleTickerProviderStateMixin {
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
-                                      Row(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          // Image placeholder
-                                          Container(
-                                            width: 50,
-                                            height: 50,
-                                            decoration: BoxDecoration(
-                                              color: Colors.orange.shade50,
-                                              borderRadius:
-                                                  BorderRadius.circular(8),
-                                            ),
-                                            child: const Center(
-                                              child: Icon(
-                                                Icons.fastfood,
-                                                color: Colors.orange,
-                                                size: 24,
-                                              ),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 12),
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                Text(
-                                                  item['nameEn'] ?? '',
-                                                  style: const TextStyle(
-                                                    fontWeight: FontWeight.bold,
-                                                    fontSize: 14,
-                                                    color: Color(0xFF1E293B),
-                                                  ),
-                                                ),
-                                                const SizedBox(height: 2),
-                                                Text(
-                                                  item['nameAr'] ?? '',
-                                                  style: TextStyle(
-                                                    color: Colors.grey[500],
-                                                    fontSize: 12,
-                                                  ),
-                                                ),
-                                                if (addons.isNotEmpty) ...[
-                                                  const SizedBox(height: 6),
-                                                  ...addons.map(
-                                                    (a) => Text(
-                                                      '+ ${a['nameEn']} / ${a['nameAr']} (\$${a['price']})',
-                                                      style: TextStyle(
-                                                        fontSize: 11,
-                                                        color: Colors.grey[600],
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ],
-                                              ],
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 12),
-                                      Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          // Quantity controls
-                                          Row(
+                                      // [ENHANCEMENT] Tapping anywhere on the product info row opens Add-ons/Modifiers
+                                      // so staff don't have to aim for a tiny edit button.
+                                      InkWell(
+                                        borderRadius: const BorderRadius.vertical(
+                                          top: Radius.circular(12),
+                                        ),
+                                        onTap: () => _openAddons(index),
+                                        child: Padding(
+                                          padding: const EdgeInsets.all(12),
+                                          child: Row(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
                                             children: [
-                                              InkWell(
-                                                onTap: () =>
-                                                    _updateQuantity(index, -1),
-                                                child: Container(
-                                                  width: 28,
-                                                  height: 28,
-                                                  decoration: BoxDecoration(
-                                                    color: Colors.orange
-                                                        .withOpacity(0.1),
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                          6,
-                                                        ),
-                                                  ),
-                                                  child: const Icon(
-                                                    Icons.remove,
-                                                    size: 16,
-                                                    color: Colors.orange,
-                                                  ),
-                                                ),
-                                              ),
+                                              // Image placeholder
                                               Container(
-                                                width: 36,
-                                                alignment: Alignment.center,
-                                                child: Text(
-                                                  '${item['quantity']}',
-                                                  style: const TextStyle(
-                                                    fontWeight: FontWeight.bold,
-                                                    fontSize: 14,
-                                                    color: Color(0xFF1E293B),
-                                                  ),
+                                                width: 50,
+                                                height: 50,
+                                                decoration: BoxDecoration(
+                                                  color: Colors.orange.shade50,
+                                                  borderRadius:
+                                                      BorderRadius.circular(8),
                                                 ),
-                                              ),
-                                              InkWell(
-                                                onTap: () =>
-                                                    _updateQuantity(index, 1),
-                                                child: Container(
-                                                  width: 28,
-                                                  height: 28,
-                                                  decoration: BoxDecoration(
-                                                    color: Colors.orange
-                                                        .withOpacity(0.1),
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                          6,
-                                                        ),
-                                                  ),
-                                                  child: const Icon(
-                                                    Icons.add,
-                                                    size: 16,
+                                                child: const Center(
+                                                  child: Icon(
+                                                    Icons.fastfood,
                                                     color: Colors.orange,
+                                                    size: 24,
                                                   ),
                                                 ),
                                               ),
                                               const SizedBox(width: 12),
-                                              InkWell(
-                                                onTap: () => _openAddons(index),
-                                                child: Container(
-                                                  width: 28,
-                                                  height: 28,
-                                                  decoration: BoxDecoration(
-                                                    color: Colors.grey
-                                                        .withOpacity(0.1),
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                          6,
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      item['nameEn'] ?? '',
+                                                      style: const TextStyle(
+                                                        fontWeight: FontWeight.bold,
+                                                        fontSize: 14,
+                                                        color: Color(0xFF1E293B),
+                                                      ),
+                                                    ),
+                                                    const SizedBox(height: 2),
+                                                    Text(
+                                                      item['nameAr'] ?? '',
+                                                      style: TextStyle(
+                                                        color: Colors.grey[500],
+                                                        fontSize: 12,
+                                                      ),
+                                                    ),
+                                                    if (addons.isNotEmpty) ...[
+                                                      const SizedBox(height: 6),
+                                                      ...addons.map(
+                                                        (a) => Text(
+                                                          '+ ${a['nameEn']} / ${a['nameAr']} (\$${a['price']})',
+                                                          style: TextStyle(
+                                                            fontSize: 11,
+                                                            color: Colors.grey[600],
+                                                          ),
                                                         ),
-                                                  ),
-                                                  child: const Icon(
-                                                    Icons.edit,
-                                                    size: 14,
-                                                    color: Colors.grey,
-                                                  ),
+                                                      ),
+                                                    ],
+                                                  ],
+                                                ),
+                                              ),
+                                              // Visual chevron cue indicating product can be tapped to edit add-ons
+                                              Padding(
+                                                padding: const EdgeInsets.only(top: 4.0),
+                                                child: Icon(
+                                                  Icons.chevron_right,
+                                                  color: Colors.grey.shade400,
+                                                  size: 20,
                                                 ),
                                               ),
                                             ],
                                           ),
-                                          // Total price for this item row
-                                          Text(
-                                            '\$${(finalPrice * item['quantity']).toStringAsFixed(2)}',
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 16,
-                                              color: Colors.orange,
+                                        ),
+                                      ),
+                                      // Quantity controls and row total price
+                                      Padding(
+                                        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                                        child: Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            // Quantity controls
+                                            Row(
+                                              children: [
+                                                InkWell(
+                                                  onTap: () =>
+                                                      _updateQuantity(index, -1),
+                                                  child: Container(
+                                                    width: 30,
+                                                    height: 30,
+                                                    decoration: BoxDecoration(
+                                                      color: Colors.orange
+                                                          .withOpacity(0.1),
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            6,
+                                                          ),
+                                                    ),
+                                                    child: const Icon(
+                                                      Icons.remove,
+                                                      size: 16,
+                                                      color: Colors.orange,
+                                                    ),
+                                                  ),
+                                                ),
+                                                Container(
+                                                  width: 36,
+                                                  alignment: Alignment.center,
+                                                  child: Text(
+                                                    '${item['quantity']}',
+                                                    style: const TextStyle(
+                                                      fontWeight: FontWeight.bold,
+                                                      fontSize: 14,
+                                                      color: Color(0xFF1E293B),
+                                                    ),
+                                                  ),
+                                                ),
+                                                InkWell(
+                                                  onTap: () =>
+                                                      _updateQuantity(index, 1),
+                                                  child: Container(
+                                                    width: 30,
+                                                    height: 30,
+                                                    decoration: BoxDecoration(
+                                                      color: Colors.orange
+                                                          .withOpacity(0.1),
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            6,
+                                                          ),
+                                                    ),
+                                                    child: const Icon(
+                                                      Icons.add,
+                                                      size: 16,
+                                                      color: Colors.orange,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
                                             ),
-                                          ),
-                                        ],
+                                            // Total price for this item row
+                                            Text(
+                                              '\$${(finalPrice * item['quantity']).toStringAsFixed(2)}',
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 16,
+                                                color: Colors.orange,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
                                       ),
                                     ],
                                   ),

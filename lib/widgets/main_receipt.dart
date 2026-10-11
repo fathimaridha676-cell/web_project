@@ -25,9 +25,24 @@ class MainReceipt {
 
     // Data Extraction
     final double totalAmount = (data['totalAmount'] as num?)?.toDouble() ?? 0.0;
-    final double cashAmount = (data['cashAmount'] as num?)?.toDouble() ?? 0.0;
-    final double creditAmount = (data['creditAmount'] as num?)?.toDouble() ?? 0.0;
+    double cashAmount = (data['cashAmount'] as num?)?.toDouble() ?? 0.0;
+    double creditAmount = (data['creditAmount'] as num?)?.toDouble() ?? 0.0;
     final double balance = (data['balance'] as num?)?.toDouble() ?? 0.0;
+
+    // [FIX] For customer app orders (printed from order_page), cashAmount/creditAmount 
+    // are not explicitly stored in the order document. If both are zero, determine 
+    // payment method (cash vs card/credit) and assign totalAmount accordingly so cash isn't shown as zero.
+    if (cashAmount == 0 && creditAmount == 0 && totalAmount > 0) {
+      final String paymentMethod =
+          (data['paymentMethod']?.toString().toLowerCase() ?? '');
+      if (paymentMethod.contains('card') ||
+          paymentMethod.contains('credit') ||
+          paymentMethod.contains('online')) {
+        creditAmount = totalAmount;
+      } else {
+        cashAmount = totalAmount; // Default to Cash (e.g. Cash on Delivery)
+      }
+    }
     final List<dynamic> items = data['items'] ?? [];
     final String orderType = data['orderType'] ?? 'Takeaway';
     final int? tokenNumber = data['tokenNumber'] != null ? int.tryParse(data['tokenNumber'].toString()) : null;
@@ -120,8 +135,16 @@ class MainReceipt {
             List rawAddons = item['addons'] ?? item['selectedAddons'] ?? [];
             for (var a in rawAddons) {
               if (a is Map) {
-                unifiedAddonsEn.add(a['nameEn']?.toString() ?? a['name']?.toString() ?? '');
-                unifiedAddonsAr.add(a['nameAr']?.toString() ?? a['arabicName']?.toString() ?? '');
+                String en = (a['nameEn']?.toString() ?? a['name']?.toString() ?? '').trim();
+                String ar = (a['nameAr']?.toString() ?? a['arabicName']?.toString() ?? '').trim();
+                // Strip any leading or trailing '+' signs already in the database
+                en = en.replaceAll(RegExp(r'^\s*\+\s*|\s*\+\s*$'), '');
+                ar = ar.replaceAll(RegExp(r'^\s*\+\s*|\s*\+\s*$'), '');
+                if (en.isNotEmpty) unifiedAddonsEn.add(en);
+                if (ar.isNotEmpty) unifiedAddonsAr.add(ar);
+              } else if (a is String && a.trim().isNotEmpty) {
+                String str = a.trim().replaceAll(RegExp(r'^\s*\+\s*|\s*\+\s*$'), '');
+                if (str.isNotEmpty) unifiedAddonsEn.add(str);
               }
             }
 
@@ -144,7 +167,8 @@ class MainReceipt {
             if (pdtChoice.isNotEmpty) unifiedAddonsEn.add(pdtChoice.join(", "));
             if (pdtOnlyOne.isNotEmpty) unifiedAddonsEn.add(pdtOnlyOne.join(", "));
             if (pdtRemove.isNotEmpty) unifiedAddonsEn.add("- ${pdtRemove.join(", ")}");
-            if (pdtAddMore.isNotEmpty) unifiedAddonsEn.add("+ ${pdtAddMore.join(", ")}");
+            // Do not prefix with '+' since items are already joined by ' + '
+            if (pdtAddMore.isNotEmpty) unifiedAddonsEn.add(pdtAddMore.join(", "));
             if (pdtAddLess.isNotEmpty) unifiedAddonsEn.add("- ${pdtAddLess.join(", ")}");
 
             if (pdtAddOnAr.isNotEmpty) unifiedAddonsAr.add(pdtAddOnAr.join(", "));
@@ -154,8 +178,19 @@ class MainReceipt {
             if (pdtAddMoreAr.isNotEmpty) unifiedAddonsAr.add("زيادة ${pdtAddMoreAr.join(", ")}");
             if (pdtAddLessAr.isNotEmpty) unifiedAddonsAr.add("تقليل ${pdtAddLessAr.join(", ")}");
 
-            String modsEn = unifiedAddonsEn.where((s) => s.isNotEmpty).join(" + ");
-            String modsAr = unifiedAddonsAr.where((s) => s.isNotEmpty).join(" + ");
+            // Strip any remaining leading/trailing '+' signs from each modifier
+            String modsEn = unifiedAddonsEn
+                .map((s) => s.trim().replaceAll(RegExp(r'^\s*\+\s*|\s*\+\s*$'), ''))
+                .where((s) => s.isNotEmpty)
+                .join(" + ");
+            String modsAr = unifiedAddonsAr
+                .map((s) => s.trim().replaceAll(RegExp(r'^\s*\+\s*|\s*\+\s*$'), ''))
+                .where((s) => s.isNotEmpty)
+                .join(" + ");
+
+            // Join English and Arabic with a single '+', and collapse any accidental double '++'
+            String allMods = [modsEn, modsAr].where((s) => s.isNotEmpty).join(" + ");
+            allMods = allMods.replaceAll(RegExp(r'\s*\+\s*(\+\s*)+'), ' + ').trim();
 
             return Padding(
               padding: const EdgeInsets.only(bottom: 6.0),
@@ -173,8 +208,8 @@ class MainReceipt {
                             Text(titleEn, style: const TextStyle(color: Colors.black, fontWeight: FontWeight.w900, fontSize: 16, height: 1.0)),
                             if (titleAr.isNotEmpty)
                               Text(titleAr, style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 16, height: 1.1)),
-                            if (modsEn.isNotEmpty || modsAr.isNotEmpty)
-                              Text('(${[modsEn, modsAr].where((s) => s.isNotEmpty).join(" + ")})', style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 14)),
+                            if (allMods.isNotEmpty)
+                              Text('($allMods)', style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 14)),
                           ],
                         ),
                       ),
