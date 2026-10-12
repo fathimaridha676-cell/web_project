@@ -770,7 +770,6 @@ class _PosPageState extends State<PosPage> with SingleTickerProviderStateMixin {
               final List<int> mainBytes = await MainReceipt.generate(
                 printData,
                 orderId,
-                context: context,
               );
 
               // 2. Generate a physical PAPER CUT command
@@ -1337,9 +1336,10 @@ class _PosPageState extends State<PosPage> with SingleTickerProviderStateMixin {
                                       // [ENHANCEMENT] Tapping anywhere on the product info row opens Add-ons/Modifiers
                                       // so staff don't have to aim for a tiny edit button.
                                       InkWell(
-                                        borderRadius: const BorderRadius.vertical(
-                                          top: Radius.circular(12),
-                                        ),
+                                        borderRadius:
+                                            const BorderRadius.vertical(
+                                              top: Radius.circular(12),
+                                            ),
                                         onTap: () => _openAddons(index),
                                         child: Padding(
                                           padding: const EdgeInsets.all(12),
@@ -1373,9 +1373,12 @@ class _PosPageState extends State<PosPage> with SingleTickerProviderStateMixin {
                                                     Text(
                                                       item['nameEn'] ?? '',
                                                       style: const TextStyle(
-                                                        fontWeight: FontWeight.bold,
+                                                        fontWeight:
+                                                            FontWeight.bold,
                                                         fontSize: 14,
-                                                        color: Color(0xFF1E293B),
+                                                        color: Color(
+                                                          0xFF1E293B,
+                                                        ),
                                                       ),
                                                     ),
                                                     const SizedBox(height: 2),
@@ -1393,7 +1396,8 @@ class _PosPageState extends State<PosPage> with SingleTickerProviderStateMixin {
                                                           '+ ${a['nameEn']} / ${a['nameAr']} (\$${a['price']})',
                                                           style: TextStyle(
                                                             fontSize: 11,
-                                                            color: Colors.grey[600],
+                                                            color: Colors
+                                                                .grey[600],
                                                           ),
                                                         ),
                                                       ),
@@ -1403,7 +1407,9 @@ class _PosPageState extends State<PosPage> with SingleTickerProviderStateMixin {
                                               ),
                                               // Visual chevron cue indicating product can be tapped to edit add-ons
                                               Padding(
-                                                padding: const EdgeInsets.only(top: 4.0),
+                                                padding: const EdgeInsets.only(
+                                                  top: 4.0,
+                                                ),
                                                 child: Icon(
                                                   Icons.chevron_right,
                                                   color: Colors.grey.shade400,
@@ -1416,7 +1422,12 @@ class _PosPageState extends State<PosPage> with SingleTickerProviderStateMixin {
                                       ),
                                       // Quantity controls and row total price
                                       Padding(
-                                        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                                        padding: const EdgeInsets.fromLTRB(
+                                          12,
+                                          0,
+                                          12,
+                                          12,
+                                        ),
                                         child: Row(
                                           mainAxisAlignment:
                                               MainAxisAlignment.spaceBetween,
@@ -1425,8 +1436,10 @@ class _PosPageState extends State<PosPage> with SingleTickerProviderStateMixin {
                                             Row(
                                               children: [
                                                 InkWell(
-                                                  onTap: () =>
-                                                      _updateQuantity(index, -1),
+                                                  onTap: () => _updateQuantity(
+                                                    index,
+                                                    -1,
+                                                  ),
                                                   child: Container(
                                                     width: 30,
                                                     height: 30,
@@ -1451,7 +1464,8 @@ class _PosPageState extends State<PosPage> with SingleTickerProviderStateMixin {
                                                   child: Text(
                                                     '${item['quantity']}',
                                                     style: const TextStyle(
-                                                      fontWeight: FontWeight.bold,
+                                                      fontWeight:
+                                                          FontWeight.bold,
                                                       fontSize: 14,
                                                       color: Color(0xFF1E293B),
                                                     ),

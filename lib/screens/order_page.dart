@@ -275,23 +275,37 @@ class _OrderPageState extends State<OrderPage> {
                                         );
 
                                         // Trigger the print job via the centralized service
-                                        final String status = data['status'] ?? 'pending';
+                                        final String status =
+                                            data['status'] ?? 'pending';
                                         List<int> printBytes = [];
-                                        
+
                                         // Logic Router: Decide which layout to use
                                         if (status == 'delivered') {
                                           // If delivered, we assume the customer is asking for a final receipt
-                                          printBytes = await MainReceipt.generate(data, orderDoc.id, context: context);
+                                          printBytes =
+                                              await MainReceipt.generate(
+                                                data,
+                                                orderDoc.id,
+                                              );
                                         } else {
                                           // If pending or in-progress, we assume the chef needs a ticket to start cooking
-                                          printBytes = await KotReceipt.generate(data, orderDoc.id, context: context);
+                                          printBytes =
+                                              await KotReceipt.generate(
+                                                data,
+                                                orderDoc.id,
+                                                context: context,
+                                              );
                                         }
-                                        
+
                                         // Always add a cut command at the end of single prints!
-                                        final profile = await CapabilityProfile.load();
-                                        final generator = Generator(PaperSize.mm80, profile);
+                                        final profile =
+                                            await CapabilityProfile.load();
+                                        final generator = Generator(
+                                          PaperSize.mm80,
+                                          profile,
+                                        );
                                         printBytes.addAll(generator.cut());
-                                        
+
                                         String printerName =
                                             await PrinterService.getPrinterName(); // Fallback for Windows
                                         String? errorMsg =
