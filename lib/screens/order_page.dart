@@ -32,24 +32,41 @@ class _OrderPageState extends State<OrderPage> {
           (orderData['paymentMethod']?.toString().toLowerCase() ?? '');
       bool isCash = paymentMethod.contains('cash');
 
-      // Update the order doc with status and payment breakdown so receipts can print cash amount properly
+      // ─────────────────────────────────────────────────────────────────
+      // CONTINUOUS SALE NUMBER FLOW (Intertwined with POS sales)
+      // ─────────────────────────────────────────────────────────────────
+      // Check if this order already has a saleNumber assigned to avoid double-incrementing
+      String saleNumber = orderData['saleNumber']?.toString() ?? '';
+      if (saleNumber.isEmpty) {
+        final settingsRef =
+            _firestore.collection('settings').doc('pos_counters');
+        final settingsDoc = await settingsRef.get();
+        final int currentTotal =
+            (settingsDoc.data()?['totalTokens'] as num?)?.toInt() ?? 0;
+        final int nextTotal = currentTotal + 1;
+
+        // Uses the exact same SAL001, SAL002 sequence format as POS
+        saleNumber = 'SAL${nextTotal.toString().padLeft(3, '0')}';
+
+        // Increment the shared counter in settings so the next sale (POS or Customer App) continues seamlessly
+        await settingsRef.set({
+          'totalTokens': nextTotal,
+        }, SetOptions(merge: true));
+      }
+
+      // Update the order doc with status, continuous saleNumber, and payment breakdown so receipts print correctly
       await docRef.update({
         'status': newStatus,
+        'saleNumber': saleNumber,
         'cashAmount': isCash ? totalAmount : 0.0,
         'creditAmount': isCash ? 0.0 : totalAmount,
         'balance': 0.0,
       });
 
-      // SAFELY grab up to 6 characters for the ID
-      String shortId = docRef.id;
-      if (shortId.length > 6) {
-        shortId = shortId.substring(0, 6);
-      }
-
       final salesData = {
         'orderId': docRef.id,
         'displayOrderId': docRef.id,
-        'saleNumber': 'APP-${shortId.toUpperCase()}',
+        'saleNumber': saleNumber, // <── Continuous SAL00X sequence shared with POS
         'source': 'Customer App',
         'orderType': orderData['orderType'] ?? 'Delivery',
         'tableId': 'N/A',
