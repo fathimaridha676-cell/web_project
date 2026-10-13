@@ -6,6 +6,7 @@ import 'package:screenshot/screenshot.dart';
 import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
 import 'package:image/image.dart' as img;
 import '../models/receipt_order_model.dart';
+import '../constants/app_images.dart';
 
 class MainReceipt {
   // ScreenshotController instance used to photograph the in-memory widgets
@@ -18,8 +19,8 @@ class MainReceipt {
   // Number of items per screenshot chunk, identical to itemCount in mainBillCopy
   static const int _itemsPerImage = 4;
 
-  // Path to the Saudi Riyal currency icon asset
-  static const String _riyalAsset = 'assets/images/saudi_riyal.png';
+  // Path to the Saudi Riyal currency icon asset from centralized AppIcons/AppImages
+  static const String _riyalAsset = AppIcons.saudiRiyal;
 
   // Cached logo bytes in memory (exact mainBillCopy method)
   static Uint8List? preloadedImage;
@@ -27,7 +28,7 @@ class MainReceipt {
   /// Call once at app startup or before printing to preload the logo into RAM
   static Future<void> preloadLogo() async {
     try {
-      final ByteData data = await rootBundle.load('assets/images/rest.jpg');
+      final ByteData data = await rootBundle.load(AppImages.restaurantLogo);
       preloadedImage = data.buffer.asUint8List();
     } catch (e) {
       print("Could not preload logo: $e");
@@ -35,20 +36,16 @@ class MainReceipt {
   }
 
   /// Primary generate method accepting the strongly-typed ReceiptOrderModel.
-  /// Keeps MainReceipt purely responsible for layout and raster byte generation.
+  /// Keeps MainReceipt purely responsible for layout, raster byte generation, and paper cutting.
   static Future<List<int>> generate(
-    dynamic orderInput, [
-    String? orderId,
-  ]) async {
-    // ───────────────────────── MODEL RESOLUTION ─────────────────────────
-    // If a ReceiptOrderModel was passed, use it directly.
-    // If a Map<String, dynamic> was passed, convert it via the model constructor.
-    final ReceiptOrderModel order = orderInput is ReceiptOrderModel
-        ? orderInput
-        : ReceiptOrderModel.fromMap(
-            orderInput as Map<String, dynamic>,
-            orderId ?? '',
-          );
+    ReceiptOrderModel receiptOrderModel, {
+    bool cut =
+        true, // Default to true so callers receive a ready-to-print, cut receipt
+  }) async {
+    // 0. Ensure restaurant logo is loaded into memory if not already cached
+    if (preloadedImage == null) {
+      await preloadLogo();
+    }
 
     // 1. Initialize printer capability profile and ESC/POS generator
     final profile = await CapabilityProfile.load();
@@ -146,7 +143,7 @@ class MainReceipt {
     List<Uint8List> itemImages = [];
     int itemImageCount = 0; // Tracks expected screenshot count
 
-    for (final item in order.items) {
+    for (final item in receiptOrderModel!.items) {
       // Inline Item row widget definition directly using the typed model
       itemWidgetsBatch.add(
         Padding(
@@ -310,16 +307,19 @@ class MainReceipt {
                     const Divider(color: Colors.black, thickness: 2),
                     _buildTotalRow(
                       'Total / الإجمالي',
-                      order.totalAmount,
+                      receiptOrderModel.totalAmount,
                       isHuge: true,
                     ),
-                    _buildTotalRow('Cash / نقدي', order.cashAmount),
-                    if (order.creditAmount > 0)
+                    _buildTotalRow('Cash / نقدي', receiptOrderModel.cashAmount),
+                    if (receiptOrderModel.creditAmount > 0)
                       _buildTotalRow(
                         'Credit / بطاقة ائتمان',
-                        order.creditAmount,
+                        receiptOrderModel.creditAmount,
                       ),
-                    _buildTotalRow('Balance / المتبقي', order.balance),
+                    _buildTotalRow(
+                      'Balance / المتبقي',
+                      receiptOrderModel.balance,
+                    ),
                     const Divider(color: Colors.black, thickness: 2),
                     const SizedBox(height: 8),
                     const Text(
@@ -382,9 +382,9 @@ class MainReceipt {
     }
 
     // 2. Hardware native English receipt details
-    if (order.tokenNumber != null) {
+    if (receiptOrderModel.tokenNumber != null) {
       bytes += generator.text(
-        'Token: #${order.tokenNumber}',
+        'Token: #${receiptOrderModel.tokenNumber}',
         styles: const PosStyles(
           bold: true,
           align: PosAlign.center,
@@ -396,38 +396,39 @@ class MainReceipt {
     }
 
     bytes += generator.text(
-      'Order ID: ${order.orderId}',
+      'Order ID: ${receiptOrderModel.orderId}',
       styles: const PosStyles(bold: true),
     );
     bytes += generator.text(
-      'Type: ${order.orderType}',
+      'Type: ${receiptOrderModel.orderType}',
       styles: const PosStyles(bold: true),
     );
     bytes += generator.text(
-      'Date: ${DateFormat('yyyy-MM-dd hh:mm a').format(order.orderDate)}',
+      'Date: ${DateFormat('yyyy-MM-dd hh:mm a').format(receiptOrderModel.orderDate)}',
     );
 
-    if (order.customerName.isNotEmpty) {
+    if (receiptOrderModel.customerName.isNotEmpty) {
       bytes += generator.text(
-        'Customer: ${order.customerName}',
+        'Customer: ${receiptOrderModel.customerName}',
         styles: const PosStyles(bold: true),
       );
     }
-    if (order.phone.isNotEmpty) {
+    if (receiptOrderModel.phone.isNotEmpty) {
       bytes += generator.text(
-        'Phone: ${order.phone}',
+        'Phone: ${receiptOrderModel.phone}',
         styles: const PosStyles(bold: true),
       );
     }
-    if (order.address.isNotEmpty) {
+    if (receiptOrderModel.address.isNotEmpty) {
       bytes += generator.text(
-        'Address: ${order.address}',
+        'Address: ${receiptOrderModel.address}',
         styles: const PosStyles(bold: true),
       );
     }
-    if (order.tableId.isNotEmpty && order.orderType == 'Dine In') {
+    if (receiptOrderModel.tableId.isNotEmpty &&
+        receiptOrderModel.orderType == 'Dine In') {
       bytes += generator.text(
-        'Table: ${order.tableId}',
+        'Table: ${receiptOrderModel.tableId}',
         styles: const PosStyles(bold: true),
       );
     }
@@ -468,10 +469,15 @@ class MainReceipt {
       bytes.addAll(generator.imageRaster(footerResized));
     }
 
-    // Feed paper
+    // Feed paper before cutting
     bytes += generator.feed(2);
 
-    // Wrap in List<int>.from to guarantee a growable list for caller operations (cut, etc.)
+    // Encapsulated paper cutting: Executed directly by the receipt widget
+    if (cut) {
+      bytes += generator.cut();
+    }
+
+    // Wrap in List<int>.from to guarantee a growable list
     return List<int>.from(bytes);
   }
 

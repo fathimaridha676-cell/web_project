@@ -5,7 +5,7 @@ import 'package:flutter/foundation.dart'; // Used to check if platform is Window
 import '../services/printer_service.dart'; // Used to fetch the saved printer config
 import '../widgets/main_receipt.dart';
 import '../widgets/kot_receipt.dart';
-import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
+import '../models/receipt_order_model.dart';
 
 class OrderPage extends StatefulWidget {
   const OrderPage({super.key});
@@ -67,13 +67,19 @@ class _OrderPageState extends State<OrderPage> {
         'orderId': docRef.id,
         'displayOrderId': docRef.id,
         'saleNumber': saleNumber, // <── Continuous SAL00X sequence shared with POS
+        'tokenNumber': orderData['tokenNumber'],
         'source': 'Customer App',
         'orderType': orderData['orderType'] ?? 'Delivery',
-        'tableId': 'N/A',
-        'tableName': 'N/A',
+        'tableId': orderData['tableId'] ?? 'N/A',
+        'tableName': orderData['tableName'] ?? 'N/A',
+        'customerName': orderData['customerName'] ?? '',
+        'phone': orderData['phone'] ?? '',
+        'address': orderData['address'] ?? '',
+        'items': orderData['items'] ?? [],
         'totalAmount': totalAmount,
         'cashAmount': isCash ? totalAmount : 0.0,
         'creditAmount': isCash ? 0.0 : totalAmount,
+        'balance': 0.0,
         'timestamp': FieldValue.serverTimestamp(),
       };
       await _firestore.collection('sales').doc(docRef.id).set(salesData);
@@ -166,6 +172,10 @@ class _OrderPageState extends State<OrderPage> {
                 rawStatus[0].toUpperCase() +
                 rawStatus.substring(1).toLowerCase();
 
+            final String displayOrderId =
+                (data['orderId'] ?? data['displayOrderId'] ?? orderDoc.id)
+                    .toString();
+
             final double totalAmount =
                 (data['totalAmount'] as num?)?.toDouble() ?? 0;
             final List<dynamic> items = data['items'] ?? [];
@@ -238,7 +248,7 @@ class _OrderPageState extends State<OrderPage> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    'Order #${orderDoc.id.substring(0, 8).toUpperCase()}',
+                                    'Order #${displayOrderId.toUpperCase()}',
                                     style: const TextStyle(
                                       fontSize: 18,
                                       fontWeight: FontWeight.bold,
@@ -286,7 +296,7 @@ class _OrderPageState extends State<OrderPage> {
                                         ).showSnackBar(
                                           SnackBar(
                                             content: Text(
-                                              'Sending Order #${orderDoc.id.substring(0, 8).toUpperCase()} to printer...',
+                                              'Sending Order #${displayOrderId.toUpperCase()} to printer...',
                                             ),
                                           ),
                                         );
@@ -294,41 +304,29 @@ class _OrderPageState extends State<OrderPage> {
                                         // Trigger the print job via the centralized service
                                         final String status =
                                             data['status'] ?? 'pending';
-                                        List<int> printBytes = [];
 
-                                        // Logic Router: Decide which layout to use
-                                        if (status == 'delivered') {
-                                          // If delivered, we assume the customer is asking for a final receipt
-                                          printBytes =
-                                              await MainReceipt.generate(
-                                                data,
-                                                orderDoc.id,
-                                              );
-                                        } else {
-                                          // If pending or in-progress, we assume the chef needs a ticket to start cooking
-                                          printBytes =
-                                              await KotReceipt.generate(
-                                                data,
-                                                orderDoc.id,
-                                                context: context,
-                                              );
-                                        }
+                                        // 1. Generate strongly-typed receipt model
+                                        final receiptModel =
+                                            ReceiptOrderModel.fromMap(
+                                              data,
+                                              displayOrderId,
+                                            );
 
-                                        // Always add a cut command at the end of single prints!
-                                        final profile =
-                                            await CapabilityProfile.load();
-                                        final generator = Generator(
-                                          PaperSize.mm80,
-                                          profile,
-                                        );
-                                        printBytes.addAll(generator.cut());
+                                        // 2. Generate receipt bytes based on order status
+                                        final List<int> printBytes =
+                                            (status == 'delivered')
+                                                ? await MainReceipt.generate(
+                                                  receiptModel,
+                                                )
+                                                : await KotReceipt.generate(
+                                                  receiptModel,
+                                                );
 
-                                        String printerName =
-                                            await PrinterService.getPrinterName(); // Fallback for Windows
-                                        String? errorMsg =
+                                        // 2. Dispatch to centralized PrinterService
+                                        // PrinterService automatically handles device discovery and platform routing (Android BLE/USB vs Windows).
+                                        final String? errorMsg =
                                             await PrinterService.printBytes(
                                               printBytes,
-                                              printerName: printerName,
                                             );
 
                                         if (context.mounted) {
@@ -544,28 +542,54 @@ class _OrderPageState extends State<OrderPage> {
                                     final title =
                                         item['nameEn'] ??
                                         item['title'] ??
+                                        item['name'] ??
                                         'Item';
-                                    final qty = item['quantity'] ?? 1;
+                                    final qty = (item['quantity'] is num)
+                                        ? (item['quantity'] as num).toInt()
+                                        : (item['qty'] is num)
+                                            ? (item['qty'] as num).toInt()
+                                            : int.tryParse(
+                                                item['quantity']?.toString() ??
+                                                    item['qty']?.toString() ??
+                                                    '1',
+                                              ) ??
+                                              1;
                                     final double basePrice =
-                                        (item['price'] as num?)?.toDouble() ??
-                                        0.0;
+                                        (item['price'] is num)
+                                            ? (item['price'] as num).toDouble()
+                                            : double.tryParse(
+                                                  item['price']?.toString() ??
+                                                      '0',
+                                                ) ??
+                                                0.0;
                                     final List<dynamic> addons =
-                                        item['addons'] ??
-                                        item['selectedAddons'] ??
-                                        [];
+                                        (item['addons'] is List)
+                                            ? item['addons']
+                                            : (item['selectedAddons'] is List)
+                                                ? item['selectedAddons']
+                                                : (item['addOns'] is List)
+                                                    ? item['addOns']
+                                                    : [];
 
                                     double addonsTotal = 0.0;
                                     List<String> addonNames = [];
                                     for (var addon in addons) {
-                                      addonsTotal +=
-                                          (addon['price'] as num?)
-                                              ?.toDouble() ??
-                                          0.0;
-                                      String addonName =
-                                          addon['nameEn'] ??
-                                          addon['title'] ??
-                                          'Addon';
-                                      addonNames.add(addonName);
+                                      if (addon is Map) {
+                                        addonsTotal +=
+                                            (addon['price'] as num?)?.toDouble() ??
+                                            double.tryParse(addon['price']?.toString() ?? '0') ??
+                                            0.0;
+                                        String addonName =
+                                            addon['nameEn']?.toString() ??
+                                            addon['title']?.toString() ??
+                                            addon['name']?.toString() ??
+                                            'Addon';
+                                        if (addonName.isNotEmpty) {
+                                          addonNames.add(addonName);
+                                        }
+                                      } else if (addon != null && addon.toString().trim().isNotEmpty) {
+                                        addonNames.add(addon.toString().trim());
+                                      }
                                     }
 
                                     final double finalPrice =

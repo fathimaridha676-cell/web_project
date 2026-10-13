@@ -1,5 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart' hide TextDirection;
 import 'package:cloud_firestore/cloud_firestore.dart';
+// Hardware printer service for managing connections (Android BLE/USB & Windows USB)
+import '../services/printer_service.dart';
+// Main receipt layout generator responsible for ESC/POS raster byte generation
+import '../widgets/main_receipt.dart';
+// Strongly-typed model for parsing, sanitizing, and calculating receipt order data
+import '../models/receipt_order_model.dart';
 
 class SalesHistoryPage extends StatefulWidget {
   const SalesHistoryPage({super.key});
@@ -12,6 +19,9 @@ class _SalesHistoryPageState extends State<SalesHistoryPage> {
   String _selectedSource = 'All';
   String _selectedOrderType = 'All';
 
+  // Tracks which specific sale is actively generating/printing to show a loading spinner
+  String? _printingSaleId;
+
   final List<String> _sources = ['All', 'POS', 'customer app'];
   final List<String> _orderTypes = [
     'All',
@@ -21,30 +31,8 @@ class _SalesHistoryPageState extends State<SalesHistoryPage> {
     'Drive Through',
   ];
 
-  String _formatDate(DateTime d) {
-    const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
-    String month = months[d.month - 1];
-    String day = d.day.toString().padLeft(2, '0');
-    int h = d.hour;
-    String ampm = h >= 12 ? 'PM' : 'AM';
-    if (h == 0) h = 12;
-    if (h > 12) h -= 12;
-    String min = d.minute.toString().padLeft(2, '0');
-    return '$month $day, ${d.year} - $h:$min $ampm';
-  }
+  String _formatDate(DateTime d) =>
+      DateFormat('MMM dd, yyyy - h:mm a').format(d);
 
   IconData _getIconForOrderType(String type) {
     switch (type) {
@@ -57,6 +45,85 @@ class _SalesHistoryPageState extends State<SalesHistoryPage> {
       case 'Dine In':
       default:
         return Icons.table_restaurant;
+    }
+  }
+
+  /// Handles fetching order line items if needed, and dispatching the raw
+  /// ESC/POS payload directly from the typed ReceiptOrderModel.
+  Future<void> _printSale(ReceiptOrderModel sale) async {
+    // 1. Verify that a thermal printer is configured on the device (BLE/USB on Android or USB on Windows)
+    final bool hasPrinter = await PrinterService.hasConfiguredPrinter();
+    if (!hasPrinter) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'No printer configured! Please set it up on the Home Page.',
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
+    // 2. Activate the loading indicator specifically for this sale item
+    setState(() {
+      _printingSaleId = sale.orderId;
+    });
+
+    try {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Sending Sale #${sale.displayOrderId} to printer...'),
+            duration: const Duration(seconds: 1),
+          ),
+        );
+      }
+
+      // 3. Generate 80mm ESC/POS raster byte array directly using typed ReceiptOrderModel
+      final List<int> printBytes = await MainReceipt.generate(sale);
+
+      // 6. Dispatch byte buffer to the physical printer via PrinterService
+      final String? errorMsg = await PrinterService.printBytes(printBytes);
+
+      // 7. Provide immediate visual feedback to the operator
+      if (mounted) {
+        if (errorMsg == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Receipt printed successfully!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Print Failed: $errorMsg'),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 5),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Print exception: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error printing receipt: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      // 8. Reset loading state once the print job concludes
+      if (mounted) {
+        setState(() {
+          _printingSaleId = null;
+        });
+      }
     }
   }
 
@@ -144,23 +211,28 @@ class _SalesHistoryPageState extends State<SalesHistoryPage> {
                   );
                 }
 
-                // Local Filtering
-                final docs = snapshot.data!.docs.where((doc) {
-                  final data = doc.data() as Map<String, dynamic>;
-                  final source = data['source']?.toString().toLowerCase() ?? '';
-                  final orderType = data['orderType']?.toString() ?? '';
+                // 1. Map all documents to strongly-typed ReceiptOrderModel instances
+                final allSales = snapshot.data!.docs.map((doc) {
+                  return ReceiptOrderModel.fromMap(
+                    doc.data() as Map<String, dynamic>,
+                    doc.id,
+                  );
+                }).toList();
 
+                // 2. Filter using clean, type-safe model getters
+                final filteredSales = allSales.where((sale) {
                   bool sourceMatches =
                       _selectedSource == 'All' ||
-                      source == _selectedSource.toLowerCase();
+                      sale.source.toLowerCase() ==
+                          _selectedSource.toLowerCase();
                   bool typeMatches =
                       _selectedOrderType == 'All' ||
-                      orderType == _selectedOrderType;
+                      sale.orderType == _selectedOrderType;
 
                   return sourceMatches && typeMatches;
                 }).toList();
 
-                if (docs.isEmpty) {
+                if (filteredSales.isEmpty) {
                   return const Center(
                     child: Text(
                       'No sales match the selected filters.',
@@ -169,36 +241,14 @@ class _SalesHistoryPageState extends State<SalesHistoryPage> {
                   );
                 }
 
+                // 3. Render clean list items using typed model getters
                 return ListView.separated(
                   padding: const EdgeInsets.all(32),
-                  itemCount: docs.length,
+                  itemCount: filteredSales.length,
                   separatorBuilder: (context, index) =>
                       Divider(color: Colors.grey.shade300, height: 1),
                   itemBuilder: (context, index) {
-                    final data = docs[index].data() as Map<String, dynamic>;
-
-                    String type = data['orderType'] ?? 'Unknown';
-                    String source = data['source'] ?? 'Unknown';
-                    String table = data['tableName']?.toString() ?? 'N/A';
-
-                    double total =
-                        double.tryParse(
-                          data['totalAmount']?.toString() ?? '0',
-                        ) ??
-                        0;
-                    double cash =
-                        double.tryParse(
-                          data['cashAmount']?.toString() ?? '0',
-                        ) ??
-                        0;
-                    double credit =
-                        double.tryParse(
-                          data['creditAmount']?.toString() ?? '0',
-                        ) ??
-                        0;
-
-                    Timestamp? ts = data['timestamp'] as Timestamp?;
-                    DateTime date = ts != null ? ts.toDate() : DateTime.now();
+                    final sale = filteredSales[index];
 
                     return Container(
                       color: const Color(0xFFFBF9FA), // light pinkish grey
@@ -216,7 +266,7 @@ class _SalesHistoryPageState extends State<SalesHistoryPage> {
                               shape: BoxShape.circle,
                             ),
                             child: Icon(
-                              _getIconForOrderType(type),
+                              _getIconForOrderType(sale.orderType),
                               color: Colors.teal,
                               size: 28,
                             ),
@@ -231,9 +281,9 @@ class _SalesHistoryPageState extends State<SalesHistoryPage> {
                                 Row(
                                   children: [
                                     Text(
-                                      type == 'Dine In'
-                                          ? 'Table: $table'
-                                          : 'Order: ${data['displayOrderId'] ?? 'N/A'}',
+                                      sale.orderType == 'Dine In'
+                                          ? 'Table: ${sale.tableName.isNotEmpty ? sale.tableName : (sale.tableId.isNotEmpty ? sale.tableId : 'N/A')}'
+                                          : 'Order: ${sale.displayOrderId}',
                                       style: const TextStyle(
                                         fontWeight: FontWeight.bold,
                                         fontSize: 16,
@@ -251,7 +301,7 @@ class _SalesHistoryPageState extends State<SalesHistoryPage> {
                                         borderRadius: BorderRadius.circular(12),
                                       ),
                                       child: Text(
-                                        type,
+                                        sale.orderType,
                                         style: const TextStyle(
                                           color: Colors.teal,
                                           fontSize: 12,
@@ -270,7 +320,7 @@ class _SalesHistoryPageState extends State<SalesHistoryPage> {
                                         borderRadius: BorderRadius.circular(12),
                                       ),
                                       child: Text(
-                                        source.toUpperCase(),
+                                        sale.source.toUpperCase(),
                                         style: const TextStyle(
                                           color: Colors.orange,
                                           fontSize: 12,
@@ -282,7 +332,7 @@ class _SalesHistoryPageState extends State<SalesHistoryPage> {
                                 ),
                                 const SizedBox(height: 8),
                                 Text(
-                                  _formatDate(date),
+                                  _formatDate(sale.orderDate),
                                   style: TextStyle(
                                     color: Colors.grey.shade600,
                                     fontSize: 13,
@@ -290,7 +340,7 @@ class _SalesHistoryPageState extends State<SalesHistoryPage> {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  'Cash: \$${cash.toStringAsFixed(2)} • Credit: \$${credit.toStringAsFixed(2)}',
+                                  'Cash: \$${sale.cashAmount.toStringAsFixed(2)} • Credit: \$${sale.creditAmount.toStringAsFixed(2)}',
                                   style: TextStyle(
                                     color: Colors.grey.shade500,
                                     fontSize: 13,
@@ -312,7 +362,7 @@ class _SalesHistoryPageState extends State<SalesHistoryPage> {
                                 ),
                               ),
                               Text(
-                                '\$${total.toStringAsFixed(2)}',
+                                '\$${sale.totalAmount.toStringAsFixed(2)}',
                                 style: const TextStyle(
                                   color: Colors.teal,
                                   fontSize: 22,
@@ -321,7 +371,41 @@ class _SalesHistoryPageState extends State<SalesHistoryPage> {
                               ),
                             ],
                           ),
-                          const SizedBox(width: 24),
+                          const SizedBox(width: 16),
+
+                          // Print Action Button for this individual sale
+                          Container(
+                            decoration: BoxDecoration(
+                              color: Colors.teal.shade50,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.teal.shade200),
+                            ),
+                            child: _printingSaleId == sale.orderId
+                                // Show progress spinner while this specific sale is generating/printing
+                                ? const Padding(
+                                    padding: EdgeInsets.all(10.0),
+                                    child: SizedBox(
+                                      width: 24,
+                                      height: 24,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.teal,
+                                      ),
+                                    ),
+                                  )
+                                // Standard print icon button
+                                : IconButton(
+                                    icon: const Icon(
+                                      Icons.print_rounded,
+                                      color: Colors.teal,
+                                    ),
+                                    tooltip: 'Print Receipt',
+                                    onPressed: _printingSaleId != null
+                                        ? null // Prevent duplicate clicks while another print is in progress
+                                        : () => _printSale(sale),
+                                  ),
+                          ),
+                          const SizedBox(width: 12),
                         ],
                       ),
                     );

@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_thermal_printer/flutter_thermal_printer.dart';
 import 'package:flutter_thermal_printer/utils/printer.dart';
-import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
 
 /// A centralized service to manage hardware printer connection and execution.
 /// It only cares about taking an array of bytes and sending it to a printer.
@@ -87,11 +86,19 @@ class PrinterService {
         
       } else {
         // --- Windows/Desktop: Route to USB Printing ---
-        
-        final isPrinterFound = await _sendToPrinter(bytes, printerName);
+        // Auto-resolve configured printer name if not explicitly passed by caller
+        final String targetPrinter = printerName.isNotEmpty
+            ? printerName
+            : await getPrinterName();
+
+        if (targetPrinter.isEmpty) {
+          return 'No Windows printer configured! Please set it up on the Home Page.';
+        }
+
+        final isPrinterFound = await _sendToPrinter(bytes, targetPrinter);
 
         if (!isPrinterFound) {
-          return 'Could not find USB printer "$printerName". Please check connections.';
+          return 'Could not find USB printer "$targetPrinter". Please check connections.';
         }
 
         return null; // Success! No error message.
@@ -99,6 +106,14 @@ class PrinterService {
     } catch (e) {
       return 'Hardware Printing error: ${e.toString()}';
     }
+  }
+
+  /// Generates physical paper cut byte commands.
+  /// Centralized here so UI screens never need to import ESC/POS generator utilities.
+  static Future<List<int>> getCutBytes() async {
+    final profile = await CapabilityProfile.load();
+    final generator = Generator(PaperSize.mm80, profile);
+    return generator.cut();
   }
 
   /// Generates a tiny receipt and prints it to the specified Android printer 
