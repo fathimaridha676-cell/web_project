@@ -425,10 +425,14 @@ class MainReceipt {
         styles: const PosStyles(bold: true),
       );
     }
-    if (receiptOrderModel.tableId.isNotEmpty &&
-        receiptOrderModel.orderType == 'Dine In') {
+    final String printTable = receiptOrderModel.tableNumber.isNotEmpty
+        ? receiptOrderModel.tableNumber
+        : (receiptOrderModel.tableName.isNotEmpty
+            ? receiptOrderModel.tableName
+            : receiptOrderModel.tableId);
+    if (printTable.isNotEmpty && receiptOrderModel.orderType == 'Dine In') {
       bytes += generator.text(
-        'Table: ${receiptOrderModel.tableId}',
+        'Table: $printTable',
         styles: const PosStyles(bold: true),
       );
     }

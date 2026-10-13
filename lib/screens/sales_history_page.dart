@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -22,6 +23,10 @@ class _SalesHistoryPageState extends State<SalesHistoryPage> {
   // Tracks which specific sale is actively generating/printing to show a loading spinner
   String? _printingSaleId;
 
+  // Cached map of Firestore table document ID -> human-readable tableNumber
+  final Map<String, String> _tablesMap = {};
+  StreamSubscription<QuerySnapshot>? _tablesSubscription;
+
   final List<String> _sources = ['All', 'POS', 'customer app'];
   final List<String> _orderTypes = [
     'All',
@@ -30,6 +35,70 @@ class _SalesHistoryPageState extends State<SalesHistoryPage> {
     'Delivery',
     'Drive Through',
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _tablesSubscription = FirebaseFirestore.instance
+        .collection('tables')
+        .snapshots()
+        .listen((snapshot) {
+      final map = <String, String>{};
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        final tNum = data['tableNumber']?.toString().trim() ?? '';
+        if (tNum.isNotEmpty) {
+          map[doc.id] = tNum;
+        }
+      }
+      if (mounted) {
+        setState(() {
+          _tablesMap.clear();
+          _tablesMap.addAll(map);
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _tablesSubscription?.cancel();
+    super.dispose();
+  }
+
+  /// Resolves the human-readable table number for a sale.
+  /// Handles new records with explicit tableNumber, records where
+  /// tableNumber was saved in tableName, and historical records where only
+  /// the Firestore table document ID was stored.
+  String _getTableDisplay(ReceiptOrderModel sale) {
+    // 1. Explicit tableNumber from the model
+    if (sale.tableNumber.isNotEmpty && sale.tableNumber != 'N/A') {
+      if (sale.tableNumber.length <= 10) return sale.tableNumber;
+      if (_tablesMap.containsKey(sale.tableNumber)) {
+        return _tablesMap[sale.tableNumber]!;
+      }
+    }
+
+    // 2. TableName if it contains tableNumber
+    if (sale.tableName.isNotEmpty && sale.tableName != 'N/A') {
+      if (sale.tableName.length <= 10) return sale.tableName;
+      if (_tablesMap.containsKey(sale.tableName)) {
+        return _tablesMap[sale.tableName]!;
+      }
+    }
+
+    // 3. Fallback to tableId lookup in _tablesMap (or short tableId)
+    if (sale.tableId.isNotEmpty && sale.tableId != 'N/A') {
+      if (_tablesMap.containsKey(sale.tableId)) {
+        return _tablesMap[sale.tableId]!;
+      }
+      if (sale.tableId.length <= 6) {
+        return sale.tableId;
+      }
+    }
+
+    return 'N/A';
+  }
 
   String _formatDate(DateTime d) =>
       DateFormat('MMM dd, yyyy - h:mm a').format(d);
@@ -82,8 +151,13 @@ class _SalesHistoryPageState extends State<SalesHistoryPage> {
         );
       }
 
-      // 3. Generate 80mm ESC/POS raster byte array directly using typed ReceiptOrderModel
-      final List<int> printBytes = await MainReceipt.generate(sale);
+      // 3. Generate 80mm ESC/POS raster byte array directly using typed ReceiptOrderModel with resolved table number
+      final resolvedTable = _getTableDisplay(sale);
+      final printableSale = sale.copyWith(
+        tableNumber: resolvedTable != 'N/A' ? resolvedTable : sale.tableNumber,
+        tableId: resolvedTable != 'N/A' ? resolvedTable : sale.tableId,
+      );
+      final List<int> printBytes = await MainReceipt.generate(printableSale);
 
       // 6. Dispatch byte buffer to the physical printer via PrinterService
       final String? errorMsg = await PrinterService.printBytes(printBytes);
@@ -282,7 +356,7 @@ class _SalesHistoryPageState extends State<SalesHistoryPage> {
                                   children: [
                                     Text(
                                       sale.orderType == 'Dine In'
-                                          ? 'Table: ${sale.tableName.isNotEmpty ? sale.tableName : (sale.tableId.isNotEmpty ? sale.tableId : 'N/A')}'
+                                          ? 'Table: ${_getTableDisplay(sale)}'
                                           : 'Order: ${sale.displayOrderId}',
                                       style: const TextStyle(
                                         fontWeight: FontWeight.bold,

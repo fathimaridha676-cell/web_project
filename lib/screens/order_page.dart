@@ -71,6 +71,7 @@ class _OrderPageState extends State<OrderPage> {
         'source': 'Customer App',
         'orderType': orderData['orderType'] ?? 'Delivery',
         'tableId': orderData['tableId'] ?? 'N/A',
+        'tableNumber': orderData['tableNumber'] ?? orderData['tableName'] ?? 'N/A',
         'tableName': orderData['tableName'] ?? 'N/A',
         'customerName': orderData['customerName'] ?? '',
         'phone': orderData['phone'] ?? '',

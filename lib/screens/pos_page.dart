@@ -652,7 +652,11 @@ class _PosPageState extends State<PosPage> {
       displayOrderId: orderId,
       tokenNumber: _currentToken,
       orderType: _selectedOrderType,
-      tableId: _selectedTable?.tableNumber ?? '',
+      tableId: _selectedTable?.id ?? '',
+      tableNumber: _selectedTable?.tableNumber ?? '',
+      tableName: (_selectedTable?.tableName.isNotEmpty ?? false)
+          ? _selectedTable!.tableName
+          : (_selectedTable?.tableNumber ?? ''),
       customerName: '',
       phone: '',
       address: '',
@@ -677,6 +681,10 @@ class _PosPageState extends State<PosPage> {
       'source': 'POS',
       'orderType': _selectedOrderType,
       'tableId': _selectedTable!.id,
+      'tableNumber': _selectedTable!.tableNumber,
+      'tableName': _selectedTable!.tableName.isNotEmpty
+          ? _selectedTable!.tableName
+          : _selectedTable!.tableNumber,
       'items': _selectedTable!.items,
       'totalAmount': totalAmount,
       'cashAmount': paymentResult['cash'],
@@ -697,7 +705,10 @@ class _PosPageState extends State<PosPage> {
       'source': 'POS',
       'orderType': _selectedOrderType,
       'tableId': _selectedTable!.id,
-      'tableName': _selectedTable!.tableNumber,
+      'tableNumber': _selectedTable!.tableNumber,
+      'tableName': _selectedTable!.tableName.isNotEmpty
+          ? _selectedTable!.tableName
+          : _selectedTable!.tableNumber,
       'items': _selectedTable!.items,
       'totalAmount': totalAmount,
       'cashAmount': paymentResult['cash'],

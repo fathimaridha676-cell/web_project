@@ -100,6 +100,7 @@ class ReceiptOrderModel {
   final String source;
   final String orderType;
   final String tableId;
+  final String tableNumber;
   final String tableName;
   final String customerName;
   final String phone;
@@ -118,6 +119,7 @@ class ReceiptOrderModel {
     this.source = 'POS',
     required this.orderType,
     required this.tableId,
+    this.tableNumber = '',
     this.tableName = '',
     required this.customerName,
     required this.phone,
@@ -161,6 +163,30 @@ class ReceiptOrderModel {
         )
         .toList();
 
+    // 3. Resolve table identity (tableId, tableNumber, tableName)
+    final String rawTableId = data['tableId']?.toString().trim() ?? '';
+    final String rawTableNum = data['tableNumber']?.toString().trim() ?? '';
+    final String rawTableName = data['tableName']?.toString().trim() ?? '';
+
+    // Smart resolution of human-readable table number:
+    // 1. Explicit tableNumber if provided
+    // 2. If tableNumber is missing, check tableName (which was often populated with tableNumber in POS)
+    // 3. If both are missing, check tableId if it is a short table code (<= 6 chars) and not a Firestore doc ID
+    String resolvedTableNumber = rawTableNum;
+    if (resolvedTableNumber.isEmpty) {
+      if (rawTableName.isNotEmpty && rawTableName != 'N/A') {
+        resolvedTableNumber = rawTableName;
+      } else if (rawTableId.isNotEmpty &&
+          rawTableId != 'N/A' &&
+          rawTableId.length <= 6) {
+        resolvedTableNumber = rawTableId;
+      }
+    }
+
+    final String resolvedTableName = rawTableName.isNotEmpty
+        ? rawTableName
+        : resolvedTableNumber;
+
     return ReceiptOrderModel(
       orderId: id,
       displayOrderId: displayId,
@@ -169,9 +195,9 @@ class ReceiptOrderModel {
           : null,
       source: data['source']?.toString() ?? 'POS',
       orderType: data['orderType']?.toString() ?? 'Takeaway',
-      tableId: data['tableId']?.toString() ?? '',
-      tableName:
-          data['tableName']?.toString() ?? data['tableId']?.toString() ?? '',
+      tableId: rawTableId,
+      tableNumber: resolvedTableNumber,
+      tableName: resolvedTableName,
       customerName: data['customerName']?.toString() ?? '',
       phone: data['phone']?.toString() ?? '',
       address: data['address']?.toString() ?? '',
@@ -192,6 +218,7 @@ class ReceiptOrderModel {
     String? source,
     String? orderType,
     String? tableId,
+    String? tableNumber,
     String? tableName,
     String? customerName,
     String? phone,
@@ -210,6 +237,7 @@ class ReceiptOrderModel {
       source: source ?? this.source,
       orderType: orderType ?? this.orderType,
       tableId: tableId ?? this.tableId,
+      tableNumber: tableNumber ?? this.tableNumber,
       tableName: tableName ?? this.tableName,
       customerName: customerName ?? this.customerName,
       phone: phone ?? this.phone,

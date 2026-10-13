@@ -45,8 +45,13 @@ class KotReceipt {
     bytes += generator.text('Type: ${_safeText(receiptOrderModel.orderType)}');
 
     // If Dine In, highlight Table number in double size for kitchen staff visibility
-    if (receiptOrderModel.orderType == 'Dine In' && receiptOrderModel.tableId.isNotEmpty) {
-      final safeTable = _safeText(receiptOrderModel.tableId);
+    final String printTable = receiptOrderModel.tableNumber.isNotEmpty
+        ? receiptOrderModel.tableNumber
+        : (receiptOrderModel.tableName.isNotEmpty
+            ? receiptOrderModel.tableName
+            : receiptOrderModel.tableId);
+    if (receiptOrderModel.orderType == 'Dine In' && printTable.isNotEmpty) {
+      final safeTable = _safeText(printTable);
       if (safeTable.isNotEmpty) {
         bytes += generator.text(
           'Table: $safeTable',
